@@ -1,41 +1,39 @@
 "use client";
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { 
+import { Button } from "@/components/ui/button";
+import {
   Wallet,
   Zap,
   Shield,
   TrendingUp,
   ArrowRight,
   Play,
-  Sparkles
-} from 'lucide-react';
+  Sparkles,
+} from "lucide-react";
+import { useAuthState } from "@/hooks/useAuthState";
+import { AuthModal } from "@/components/auth/AuthModal";
+import Link from "next/link";
 
 const features = [
   {
     icon: Zap,
-    title: 'Instant Monetization',
-    description: 'Turn your content into revenue streams within minutes'
+    title: "Instant Monetization",
+    description: "Turn your content into revenue streams within minutes",
   },
   {
     icon: Shield,
-    title: 'Blockchain Security',
-    description: 'IpNFTs with embedded licensing on BaseCAMP L1'
+    title: "Blockchain Security",
+    description: "IpNFTs with embedded licensing on BaseCAMP L1",
   },
   {
     icon: TrendingUp,
-    title: '95% Creator Royalties',
-    description: 'Keep almost everything you earn from AI training'
-  }
+    title: "95% Creator Royalties",
+    description: "Keep almost everything you earn from AI training",
+  },
 ];
 
 export default function Hero() {
-  const [isConnected, setIsConnected] = useState(false);
-
-  const handleConnect = () => {
-    setIsConnected(true);
-  };
+  const { authenticated, loading } = useAuthState();
 
   return (
     <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
@@ -65,32 +63,30 @@ export default function Hero() {
 
           {/* Subheadline */}
           <p className="text-xl md:text-2xl text-gray-300 mb-8 leading-relaxed max-w-3xl mx-auto">
-            Turn your creative work into IpNFTs with embedded licensing. 
-            Earn from AI companies while maintaining full control and ownership.
+            Turn your creative work into IpNFTs with embedded licensing. Earn
+            from AI companies while maintaining full control and ownership.
           </p>
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-            {!isConnected ? (
-              <Button
-                size="lg"
-                onClick={handleConnect}
-                className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-8 py-4 text-lg animate-glow"
-              >
-                <Wallet className="h-5 w-5 mr-2" />
-                Connect Wallet to Start
-                <ArrowRight className="h-5 w-5 ml-2" />
-              </Button>
+            {loading ? (
+              <div className="animate-pulse bg-gray-700 h-14 w-64 rounded-md"></div>
+            ) : !authenticated ? (
+              <div className="flex items-center">
+                <AuthModal />
+              </div>
             ) : (
-              <Button
-                size="lg"
-                className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-8 py-4 text-lg"
-              >
-                Launch Dashboard
-                <ArrowRight className="h-5 w-5 ml-2" />
-              </Button>
+              <Link href="/dashboard">
+                <Button
+                  size="lg"
+                  className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-8 py-4 text-lg"
+                >
+                  Launch Dashboard
+                  <ArrowRight className="h-5 w-5 ml-2" />
+                </Button>
+              </Link>
             )}
-            
+
             <Button
               size="lg"
               variant="outline"
@@ -114,7 +110,9 @@ export default function Hero() {
                   <div className="h-12 w-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center mb-4 mx-auto">
                     <Icon className="h-6 w-6 text-white" />
                   </div>
-                  <h3 className="font-semibold text-lg mb-2">{feature.title}</h3>
+                  <h3 className="font-semibold text-lg mb-2">
+                    {feature.title}
+                  </h3>
                   <p className="text-gray-400 text-sm">{feature.description}</p>
                 </div>
               );

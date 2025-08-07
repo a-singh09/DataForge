@@ -1,40 +1,40 @@
 "use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { 
-  Menu, 
-  X, 
-  Wallet, 
-  User, 
-  BarChart3, 
+import { useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import {
+  Menu,
+  X,
+  Wallet,
+  User,
+  BarChart3,
   Upload,
   Search,
-  Settings
-} from 'lucide-react';
+  Settings,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAuthState } from "@/hooks/useAuthState";
+import { useAuth } from "@/hooks/useAuth";
+import { AuthModal } from "@/components/auth/AuthModal";
 
 const navigation = [
-  { name: 'Marketplace', href: '/marketplace', icon: Search },
-  { name: 'Upload', href: '/upload', icon: Upload },
-  { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
+  { name: "Marketplace", href: "/marketplace", icon: Search },
+  { name: "Upload", href: "/upload", icon: Upload },
+  { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
 ];
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
-  const [isConnected, setIsConnected] = useState(false);
-
-  const handleConnect = () => {
-    setIsConnected(true);
-  };
+  const { authenticated, loading } = useAuthState();
+  const { disconnect } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-gray-800/50 bg-gray-950/80 backdrop-blur-md">
@@ -45,7 +45,9 @@ export default function Header() {
             <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center">
               <span className="text-white font-bold text-sm">CV</span>
             </div>
-            <span className="font-space text-xl font-bold gradient-text">CreatorVault</span>
+            <span className="font-space text-xl font-bold gradient-text">
+              CreatorVault
+            </span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -57,9 +59,7 @@ export default function Header() {
                   key={item.name}
                   href={item.href}
                   className={`flex items-center space-x-2 text-sm font-medium transition-colors hover:text-orange-400 ${
-                    pathname === item.href
-                      ? 'text-orange-400'
-                      : 'text-gray-300'
+                    pathname === item.href ? "text-orange-400" : "text-gray-300"
                   }`}
                 >
                   <Icon className="h-4 w-4" />
@@ -71,38 +71,51 @@ export default function Header() {
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center space-x-4">
-            {!isConnected ? (
-              <Button
-                onClick={handleConnect}
-                className="bg-orange-500 hover:bg-orange-600 text-white font-medium"
-              >
-                <Wallet className="h-4 w-4 mr-2" />
-                Connect Wallet
-              </Button>
+            {loading ? (
+              <div className="animate-pulse bg-gray-700 h-10 w-32 rounded-md"></div>
             ) : (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full">
-                    <div className="h-8 w-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center">
-                      <User className="h-4 w-4 text-white" />
-                    </div>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48 bg-gray-900 border-gray-800">
-                  <DropdownMenuItem asChild>
-                    <Link href="/profile" className="cursor-pointer">
-                      <User className="h-4 w-4 mr-2" />
-                      Profile
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/ai-dashboard" className="cursor-pointer">
-                      <Settings className="h-4 w-4 mr-2" />
-                      AI Dashboard
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <>
+                <AuthModal />
+                {authenticated && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-full"
+                      >
+                        <div className="h-8 w-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center">
+                          <User className="h-4 w-4 text-white" />
+                        </div>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-48 bg-gray-900 border-gray-800"
+                    >
+                      <DropdownMenuItem asChild>
+                        <Link href="/profile" className="cursor-pointer">
+                          <User className="h-4 w-4 mr-2" />
+                          Profile
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/ai-dashboard" className="cursor-pointer">
+                          <Settings className="h-4 w-4 mr-2" />
+                          AI Dashboard
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={disconnect}
+                        className="cursor-pointer text-red-400"
+                      >
+                        <Wallet className="h-4 w-4 mr-2" />
+                        Disconnect
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </>
             )}
           </div>
 
@@ -113,7 +126,11 @@ export default function Header() {
             className="md:hidden"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
-            {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            {mobileMenuOpen ? (
+              <X className="h-6 w-6" />
+            ) : (
+              <Menu className="h-6 w-6" />
+            )}
           </Button>
         </div>
 
@@ -129,8 +146,8 @@ export default function Header() {
                     href={item.href}
                     className={`flex items-center space-x-2 text-sm font-medium transition-colors hover:text-orange-400 ${
                       pathname === item.href
-                        ? 'text-orange-400'
-                        : 'text-gray-300'
+                        ? "text-orange-400"
+                        : "text-gray-300"
                     }`}
                     onClick={() => setMobileMenuOpen(false)}
                   >
@@ -140,24 +157,41 @@ export default function Header() {
                 );
               })}
               <div className="pt-4 border-t border-gray-800">
-                {!isConnected ? (
-                  <Button
-                    onClick={handleConnect}
-                    className="w-full bg-orange-500 hover:bg-orange-600 text-white font-medium"
-                  >
-                    <Wallet className="h-4 w-4 mr-2" />
-                    Connect Wallet
-                  </Button>
+                {loading ? (
+                  <div className="animate-pulse bg-gray-700 h-10 w-full rounded-md"></div>
                 ) : (
-                  <div className="space-y-2">
-                    <Link
-                      href="/profile"
-                      className="flex items-center space-x-2 text-sm font-medium text-gray-300 hover:text-orange-400"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <User className="h-4 w-4" />
-                      <span>Profile</span>
-                    </Link>
+                  <div className="space-y-4">
+                    <AuthModal />
+                    {authenticated && (
+                      <div className="space-y-2">
+                        <Link
+                          href="/profile"
+                          className="flex items-center space-x-2 text-sm font-medium text-gray-300 hover:text-orange-400"
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          <User className="h-4 w-4" />
+                          <span>Profile</span>
+                        </Link>
+                        <Link
+                          href="/ai-dashboard"
+                          className="flex items-center space-x-2 text-sm font-medium text-gray-300 hover:text-orange-400"
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          <Settings className="h-4 w-4" />
+                          <span>AI Dashboard</span>
+                        </Link>
+                        <button
+                          onClick={() => {
+                            disconnect();
+                            setMobileMenuOpen(false);
+                          }}
+                          className="flex items-center space-x-2 text-sm font-medium text-red-400 hover:text-red-300"
+                        >
+                          <Wallet className="h-4 w-4" />
+                          <span>Disconnect</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
