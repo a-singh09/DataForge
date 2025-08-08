@@ -1,21 +1,24 @@
 "use client";
 
-import { useState, useCallback } from 'react';
-import { useDropzone } from 'react-dropzone';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { 
-  Upload, 
-  FileText, 
-  Image, 
-  Music, 
-  Video, 
+import { useState, useCallback } from "react";
+import { useDropzone } from "react-dropzone";
+import { useAuth, useAuthState } from "@campnetwork/origin/react";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Upload,
+  FileText,
+  Image,
+  Music,
+  Video,
   Code,
   X,
   Check,
   ArrowLeft,
-  ArrowRight
-} from 'lucide-react';
+  ArrowRight,
+  AlertCircle,
+} from "lucide-react";
 
 interface FileUploadProps {
   onDataChange: (data: any) => void;
@@ -23,76 +26,230 @@ interface FileUploadProps {
   onBack: () => void;
 }
 
-const getFileIcon = (type: string) => {
-  if (type.startsWith('image/')) return Image;
-  if (type.startsWith('video/')) return Video;
-  if (type.startsWith('audio/')) return Music;
-  if (type.includes('text') || type.includes('json')) return FileText;
-  if (type.includes('javascript') || type.includes('python')) return Code;
+interface FileWithPreview extends File {
+  preview?: string;
+  uploadProgress?: number;
+  uploadError?: string;
+  fileId?: string;
+}
+
+const getFileIcon = (type: string | undefined) => {
+  if (!type) return FileText;
+  if (type.startsWith("image/")) return Image;
+  if (type.startsWith("video/")) return Video;
+  if (type.startsWith("audio/")) return Music;
+  if (type.includes("text") || type.includes("json")) return FileText;
+  if (type.includes("javascript") || type.includes("python")) return Code;
   return FileText;
 };
 
-export default function FileUpload({ onDataChange, onNext, onBack }: FileUploadProps) {
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
+export default function FileUpload({
+  onDataChange,
+  onNext,
+  onBack,
+}: FileUploadProps) {
+  const [uploadedFiles, setUploadedFiles] = useState<FileWithPreview[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const { authenticated } = useAuthState();
+  const auth = useAuth();
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    setIsUploading(true);
-    
-    acceptedFiles.forEach((file) => {
-      // Simulate upload progress
-      let progress = 0;
-      const interval = setInterval(() => {
-        progress += Math.random() * 30;
-        if (progress >= 100) {
-          progress = 100;
-          clearInterval(interval);
-        }
-        
-        setUploadProgress(prev => ({ ...prev, [file.name]: progress }));
-        
-        if (progress === 100) {
-          setUploadedFiles(prev => [...prev, file]);
-        }
-      }, 200);
+  const validateFile = (file: File): string | null => {
+    // File size validation (max 100MB)
+    const maxSize = 100 * 1024 * 1024;
+    if (file.size > maxSize) {
+      return `File "${file.name}" is too large. Maximum size is 100MB.`;
+    }
+
+    // File type validation
+    const allowedTypes = [
+      "image/",
+      "video/",
+      "audio/",
+      "text/",
+      "application/pdf",
+      "application/json",
+      "application/zip",
+      "application/javascript",
+      "application/python",
+    ];
+
+    const isAllowed =
+      file.type && allowedTypes.some((type) => file.type.startsWith(type));
+    if (!isAllowed) {
+      return `File type "${file.type || "unknown"}" is not supported.`;
+    }
+
+    return null;
+  };
+
+  const generatePreview = (file: File): Promise<string | null> => {
+    return new Promise((resolve) => {
+      if (file.type && file.type.startsWith("image/")) {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      } else {
+        resolve(null);
+      }
     });
+  };
 
-    setIsUploading(false);
-  }, []);
+  const onDrop = useCallback(
+    async (acceptedFiles: File[], rejectedFiles: any[]) => {
+      setUploadError(null);
+      setIsUploading(true);
+
+      // Handle rejected files
+      if (rejectedFiles.length > 0) {
+        const errors = rejectedFiles
+          .map(
+            ({ file, errors }) =>
+              `${file.name}: ${errors.map((e: any) => e.message).join(", ")}`,
+          )
+          .join("\n");
+        setUploadError(`Some files were rejected:\n${errors}`);
+      }
+
+      // Process accepted files
+      const processedFiles: FileWithPreview[] = [];
+
+      for (const file of acceptedFiles) {
+        // Validate file
+        const validationError = validateFile(file);
+        if (validationError) {
+          setUploadError((prev) =>
+            prev ? `${prev}\n${validationError}` : validationError,
+          );
+          continue;
+        }
+
+        // Generate preview
+        const preview = await generatePreview(file);
+
+        // Create a wrapper that preserves the File object and adds our properties
+        const fileWithPreview: FileWithPreview = {
+          // Preserve all File properties
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          lastModified: file.lastModified,
+          webkitRelativePath: file.webkitRelativePath,
+          // Add File methods
+          arrayBuffer: file.arrayBuffer.bind(file),
+          slice: file.slice.bind(file),
+          stream: file.stream.bind(file),
+          text: file.text.bind(file),
+          // Add our custom properties
+          preview,
+          uploadProgress: 0,
+          fileId: `${file.name}-${file.size}-${file.lastModified}`,
+        } as FileWithPreview;
+
+        // Debug the file properties
+        console.log("File processing:", {
+          originalFile: {
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            lastModified: file.lastModified,
+          },
+          processedFile: {
+            name: fileWithPreview.name,
+            type: fileWithPreview.type,
+            size: fileWithPreview.size,
+            lastModified: fileWithPreview.lastModified,
+            uploadProgress: fileWithPreview.uploadProgress,
+          },
+        });
+
+        processedFiles.push(fileWithPreview);
+      }
+
+      // Add files to state first
+      setUploadedFiles((prev) => [...prev, ...processedFiles]);
+
+      // Then simulate upload progress for each file
+      processedFiles.forEach((file, index) => {
+        let progress = 0;
+        const interval = setInterval(
+          () => {
+            progress += Math.random() * 25 + 5; // 5-30% increments
+            if (progress >= 100) {
+              progress = 100;
+              clearInterval(interval);
+            }
+
+            // Update file progress using unique file ID
+            setUploadedFiles((prev) => {
+              console.log(`Updating progress for ${file.name}: ${progress}%`);
+              const updated = prev.map((f) => {
+                if (f.fileId === file.fileId) {
+                  console.log(
+                    `Found matching file by ID, updating progress to ${progress}%`,
+                  );
+                  return { ...f, uploadProgress: progress };
+                }
+                return f;
+              });
+              return updated;
+            });
+          },
+          150 + index * 50,
+        ); // Stagger the uploads slightly
+      });
+      setIsUploading(false);
+    },
+    [],
+  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     multiple: true,
+    maxSize: 100 * 1024 * 1024, // 100MB
     accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp'],
-      'video/*': ['.mp4', '.mov', '.avi', '.mkv'],
-      'audio/*': ['.mp3', '.wav', '.aac', '.flac'],
-      'text/*': ['.txt', '.md', '.csv', '.json'],
-      'application/pdf': ['.pdf'],
-      'application/zip': ['.zip'],
-    }
+      "image/*": [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"],
+      "video/*": [".mp4", ".mov", ".avi", ".mkv", ".webm"],
+      "audio/*": [".mp3", ".wav", ".aac", ".flac", ".ogg"],
+      "text/*": [".txt", ".md", ".csv", ".json"],
+      "application/pdf": [".pdf"],
+      "application/zip": [".zip", ".rar", ".7z"],
+      "application/javascript": [".js", ".jsx"],
+      "application/typescript": [".ts", ".tsx"],
+      "text/x-python": [".py"],
+    },
   });
 
   const removeFile = (fileName: string) => {
-    setUploadedFiles(prev => prev.filter(file => file.name !== fileName));
-    setUploadProgress(prev => {
-      const updated = { ...prev };
-      delete updated[fileName];
-      return updated;
+    setUploadedFiles((prev) => {
+      const filtered = prev.filter((file) => file.name !== fileName);
+      // Revoke object URL for image previews to prevent memory leaks
+      const fileToRemove = prev.find((file) => file.name === fileName);
+      if (fileToRemove?.preview) {
+        URL.revokeObjectURL(fileToRemove.preview);
+      }
+      return filtered;
     });
   };
 
   const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return "0 Bytes";
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
   const handleNext = () => {
-    onDataChange({ files: uploadedFiles });
+    // Only pass fully uploaded files
+    const completedFiles = uploadedFiles.filter(
+      (file) => file.uploadProgress === 100,
+    );
+    onDataChange({
+      files: completedFiles,
+      uploadType: "file",
+    });
     onNext();
   };
 
@@ -109,9 +266,9 @@ export default function FileUpload({ onDataChange, onNext, onBack }: FileUploadP
       <div
         {...getRootProps()}
         className={`glass rounded-2xl p-12 mb-8 border-2 border-dashed transition-all duration-300 cursor-pointer ${
-          isDragActive 
-            ? 'border-orange-500 bg-orange-500/10' 
-            : 'border-gray-700 hover:border-gray-600'
+          isDragActive
+            ? "border-orange-500 bg-orange-500/10"
+            : "border-gray-700 hover:border-gray-600"
         }`}
       >
         <input {...getInputProps()} />
@@ -134,34 +291,79 @@ export default function FileUpload({ onDataChange, onNext, onBack }: FileUploadP
         </div>
       </div>
 
+      {/* Upload Error */}
+      {uploadError && (
+        <Alert className="mb-6 border-red-500/20 bg-red-500/10">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="whitespace-pre-line">
+            {uploadError}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Authentication Warning */}
+      {!authenticated && (
+        <Alert className="mb-6 border-orange-500/20 bg-orange-500/10">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            You need to connect your wallet to upload files. The files will be
+            stored locally until you authenticate.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Uploaded Files */}
-      {(uploadedFiles.length > 0 || Object.keys(uploadProgress).length > 0) && (
+      {uploadedFiles.length > 0 && (
         <div className="glass rounded-2xl p-6 mb-8">
-          <h3 className="text-lg font-semibold mb-4">Uploaded Files ({uploadedFiles.length})</h3>
+          <h3 className="text-lg font-semibold mb-4">
+            Uploaded Files ({uploadedFiles.length})
+          </h3>
           <div className="space-y-4 max-h-96 overflow-y-auto">
-            {[...uploadedFiles, ...Object.keys(uploadProgress)
-              .filter(name => !uploadedFiles.some(f => f.name === name))
-              .map(name => ({ name, size: 0, type: 'unknown' } as File))
-            ].map((file, index) => {
+            {uploadedFiles.map((file, index) => {
               const FileIcon = getFileIcon(file.type);
-              const progress = uploadProgress[file.name] || 100;
-              const isUploaded = uploadedFiles.some(f => f.name === file.name);
-              
+              const progress = file.uploadProgress || 0;
+              const isUploaded = progress === 100;
+
               return (
-                <div key={`${file.name}-${index}`} className="flex items-center space-x-4 p-4 bg-gray-800/50 rounded-lg">
-                  <div className="h-10 w-10 bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <FileIcon className="h-5 w-5 text-gray-400" />
+                <div
+                  key={`${file.name}-${index}`}
+                  className="flex items-start space-x-4 p-4 bg-gray-800/50 rounded-lg"
+                >
+                  {/* File Preview/Icon */}
+                  <div className="h-16 w-16 bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    {file.preview ? (
+                      <img
+                        src={file.preview}
+                        alt={file.name}
+                        className="h-full w-full object-cover rounded-lg"
+                      />
+                    ) : (
+                      <FileIcon className="h-8 w-8 text-gray-400" />
+                    )}
                   </div>
-                  
+
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm font-medium truncate">{file.name}</p>
-                      <div className="flex items-center space-x-2">
-                        {file.size > 0 && (
-                          <span className="text-xs text-gray-500">
-                            {formatFileSize(file.size)}
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate mb-1">
+                          {file.name}
+                        </p>
+                        <div className="flex items-center space-x-3 text-xs text-gray-500">
+                          <span>{formatFileSize(file.size)}</span>
+                          <span>•</span>
+                          <span className="capitalize">
+                            {file.type ? file.type.split("/")[0] : "Unknown"}
                           </span>
-                        )}
+                          {isUploaded && (
+                            <>
+                              <span>•</span>
+                              <span className="text-green-400">Ready</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-2 ml-4">
                         {isUploaded ? (
                           <>
                             <Check className="h-4 w-4 text-green-400" />
@@ -179,9 +381,20 @@ export default function FileUpload({ onDataChange, onNext, onBack }: FileUploadP
                         )}
                       </div>
                     </div>
-                    
+
                     {!isUploaded && (
-                      <Progress value={progress} className="h-2" />
+                      <div className="space-y-2">
+                        <Progress value={progress} className="h-2" />
+                        <p className="text-xs text-gray-400">
+                          Uploading... {Math.round(progress)}%
+                        </p>
+                      </div>
+                    )}
+
+                    {file.uploadError && (
+                      <p className="text-xs text-red-400 mt-2">
+                        Error: {file.uploadError}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -197,13 +410,21 @@ export default function FileUpload({ onDataChange, onNext, onBack }: FileUploadP
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
-        
+
         <Button
           onClick={handleNext}
-          disabled={uploadedFiles.length === 0}
+          disabled={
+            uploadedFiles.length === 0 ||
+            uploadedFiles.some((file) => file.uploadProgress !== 100) ||
+            isUploading
+          }
           className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50"
         >
-          Continue to Metadata
+          {isUploading
+            ? "Processing Files..."
+            : uploadedFiles.some((file) => file.uploadProgress !== 100)
+              ? "Uploading..."
+              : "Continue to Metadata"}
           <ArrowRight className="h-4 w-4 ml-2" />
         </Button>
       </div>

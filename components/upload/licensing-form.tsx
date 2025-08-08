@@ -1,19 +1,28 @@
 "use client";
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
-import { 
+import { useState, useEffect } from "react";
+import { useAuth, useAuthState } from "@campnetwork/origin/react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
   ArrowLeft,
   ArrowRight,
   DollarSign,
   Clock,
   Percent,
-  Info
-} from 'lucide-react';
+  Info,
+  AlertCircle,
+} from "lucide-react";
 
 interface LicensingFormProps {
   data: any;
@@ -22,38 +31,87 @@ interface LicensingFormProps {
   onBack: () => void;
 }
 
+// Payment tokens supported by Origin SDK on BaseCAMP
 const paymentTokens = [
-  { value: 'ETH', label: 'ETH', rate: 1 },
-  { value: 'USDC', label: 'USDC', rate: 2800 },
-  { value: 'BASE', label: 'BASE Token', rate: 0.5 },
+  {
+    value: "0x0000000000000000000000000000000000000000",
+    label: "ETH (Native)",
+    symbol: "ETH",
+    decimals: 18,
+  },
+  // Add other supported tokens as needed
 ];
 
 const licenseDurations = [
-  { value: '30', label: '30 Days', multiplier: 1 },
-  { value: '90', label: '90 Days', multiplier: 2.5 },
-  { value: '365', label: '1 Year', multiplier: 8 },
-  { value: 'lifetime', label: 'Lifetime', multiplier: 20 },
+  { value: 30 * 24 * 60 * 60, label: "30 Days", displayValue: "30" },
+  { value: 90 * 24 * 60 * 60, label: "90 Days", displayValue: "90" },
+  { value: 365 * 24 * 60 * 60, label: "1 Year", displayValue: "365" },
+  {
+    value: 10 * 365 * 24 * 60 * 60,
+    label: "10 Years",
+    displayValue: "lifetime",
+  },
 ];
 
-export default function LicensingForm({ data, onDataChange, onNext, onBack }: LicensingFormProps) {
+export default function LicensingForm({
+  data,
+  onDataChange,
+  onNext,
+  onBack,
+}: LicensingFormProps) {
+  const { authenticated } = useAuthState();
+  const auth = useAuth();
+
   const [licensing, setLicensing] = useState({
     fixedPrice: 0.1,
-    duration: '365',
-    royaltyPercentage: 95,
-    paymentToken: 'ETH',
-    ...data.licensing
+    duration: 365 * 24 * 60 * 60, // 1 year in seconds
+    royaltyPercentage: 95, // 95% to creator, 5% platform fee
+    paymentToken: "0x0000000000000000000000000000000000000000", // Native ETH
+    ...data.licensing,
   });
+
+  // Set initial license terms when component mounts
+  useEffect(() => {
+    const licenseTerms = {
+      price: BigInt(Math.floor(licensing.fixedPrice * 1e18)), // Convert to wei
+      duration: licensing.duration,
+      royaltyBps: licensing.royaltyPercentage * 100, // Convert percentage to basis points
+      paymentToken: licensing.paymentToken as `0x${string}`,
+    };
+
+    onDataChange({
+      licensing,
+      licenseTerms,
+    });
+  }, []); // Only run on mount
 
   const handleChange = (field: string, value: any) => {
     const updated = { ...licensing, [field]: value };
     setLicensing(updated);
-    onDataChange({ licensing: updated });
+
+    // Create Origin SDK compatible license terms
+    const licenseTerms = {
+      price: BigInt(Math.floor(updated.fixedPrice * 1e18)), // Convert to wei
+      duration: updated.duration,
+      royaltyBps: updated.royaltyPercentage * 100, // Convert percentage to basis points
+      paymentToken: updated.paymentToken as `0x${string}`,
+    };
+
+    onDataChange({
+      licensing: updated,
+      licenseTerms,
+    });
   };
 
-  const selectedToken = paymentTokens.find(token => token.value === licensing.paymentToken);
-  const selectedDuration = licenseDurations.find(d => d.value === licensing.duration);
+  const selectedToken = paymentTokens.find(
+    (token) => token.value === licensing.paymentToken,
+  );
+  const selectedDuration = licenseDurations.find(
+    (d) => d.value === licensing.duration,
+  );
   const platformFee = (100 - licensing.royaltyPercentage) / 100;
-  const creatorEarning = licensing.fixedPrice * (licensing.royaltyPercentage / 100);
+  const creatorEarning =
+    licensing.fixedPrice * (licensing.royaltyPercentage / 100);
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -63,6 +121,17 @@ export default function LicensingForm({ data, onDataChange, onNext, onBack }: Li
           Configure pricing and terms for AI companies to license your content
         </p>
       </div>
+
+      {/* Authentication Warning */}
+      {!authenticated && (
+        <Alert className="border-orange-500/20 bg-orange-500/10">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            You need to connect your wallet to set licensing terms and mint
+            IpNFTs.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="space-y-8">
         {/* Pricing Section */}
@@ -75,7 +144,10 @@ export default function LicensingForm({ data, onDataChange, onNext, onBack }: Li
           <div className="grid md:grid-cols-2 gap-6">
             {/* Fixed Price */}
             <div>
-              <Label htmlFor="price" className="text-base font-medium mb-3 block">
+              <Label
+                htmlFor="price"
+                className="text-base font-medium mb-3 block"
+              >
                 Fixed Price *
               </Label>
               <div className="relative">
@@ -85,11 +157,13 @@ export default function LicensingForm({ data, onDataChange, onNext, onBack }: Li
                   step="0.01"
                   min="0.01"
                   value={licensing.fixedPrice}
-                  onChange={(e) => handleChange('fixedPrice', parseFloat(e.target.value) || 0)}
+                  onChange={(e) =>
+                    handleChange("fixedPrice", parseFloat(e.target.value) || 0)
+                  }
                   className="h-12 text-lg pr-16"
                 />
                 <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400">
-                  {licensing.paymentToken}
+                  {selectedToken?.symbol || "ETH"}
                 </div>
               </div>
             </div>
@@ -99,7 +173,10 @@ export default function LicensingForm({ data, onDataChange, onNext, onBack }: Li
               <Label className="text-base font-medium mb-3 block">
                 Payment Token
               </Label>
-              <Select value={licensing.paymentToken} onValueChange={(value) => handleChange('paymentToken', value)}>
+              <Select
+                value={licensing.paymentToken}
+                onValueChange={(value) => handleChange("paymentToken", value)}
+              >
                 <SelectTrigger className="h-12">
                   <SelectValue />
                 </SelectTrigger>
@@ -122,18 +199,21 @@ export default function LicensingForm({ data, onDataChange, onNext, onBack }: Li
             License Duration
           </h3>
 
-          <Select value={licensing.duration} onValueChange={(value) => handleChange('duration', value)}>
+          <Select
+            value={licensing.duration.toString()}
+            onValueChange={(value) => handleChange("duration", parseInt(value))}
+          >
             <SelectTrigger className="h-12">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {licenseDurations.map((duration) => (
-                <SelectItem key={duration.value} value={duration.value}>
+                <SelectItem
+                  key={duration.value}
+                  value={duration.value.toString()}
+                >
                   <div className="flex justify-between items-center w-full">
                     <span>{duration.label}</span>
-                    <span className="text-gray-400 ml-4">
-                      {duration.multiplier}x multiplier
-                    </span>
                   </div>
                 </SelectItem>
               ))}
@@ -141,7 +221,8 @@ export default function LicensingForm({ data, onDataChange, onNext, onBack }: Li
           </Select>
 
           <p className="text-sm text-gray-400 mt-3">
-            Longer licenses typically command higher prices and provide more value
+            Longer licenses typically command higher prices and provide more
+            value
           </p>
         </div>
 
@@ -162,16 +243,18 @@ export default function LicensingForm({ data, onDataChange, onNext, onBack }: Li
                   {licensing.royaltyPercentage}%
                 </span>
               </div>
-              
+
               <Slider
                 value={[licensing.royaltyPercentage]}
-                onValueChange={(value) => handleChange('royaltyPercentage', value[0])}
+                onValueChange={(value) =>
+                  handleChange("royaltyPercentage", value[0])
+                }
                 min={85}
                 max={98}
                 step={1}
                 className="mb-4"
               />
-              
+
               <div className="flex justify-between text-sm text-gray-400">
                 <span>85% (Min)</span>
                 <span>98% (Max)</span>
@@ -182,10 +265,13 @@ export default function LicensingForm({ data, onDataChange, onNext, onBack }: Li
               <div className="flex items-start space-x-3">
                 <Info className="h-5 w-5 text-blue-400 mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="text-sm font-medium mb-2">Royalty Information</p>
+                  <p className="text-sm font-medium mb-2">
+                    Royalty Information
+                  </p>
                   <p className="text-xs text-gray-400 leading-relaxed">
-                    CreatorVault takes a small platform fee (2-15%) to maintain the marketplace and handle payments. 
-                    The remaining percentage goes directly to you as the creator.
+                    CreatorVault takes a small platform fee (2-15%) to maintain
+                    the marketplace and handle payments. The remaining
+                    percentage goes directly to you as the creator.
                   </p>
                 </div>
               </div>
@@ -196,34 +282,42 @@ export default function LicensingForm({ data, onDataChange, onNext, onBack }: Li
         {/* Pricing Summary */}
         <div className="glass rounded-2xl p-8 bg-gradient-to-br from-orange-500/10 to-purple-500/10">
           <h3 className="text-xl font-semibold mb-6">Pricing Summary</h3>
-          
+
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <span className="text-gray-400">License Price:</span>
               <span className="text-lg font-semibold">
-                {licensing.fixedPrice} {licensing.paymentToken}
+                {licensing.fixedPrice} {selectedToken?.symbol || "ETH"}
               </span>
             </div>
-            
+
             <div className="flex justify-between items-center">
               <span className="text-gray-400">License Duration:</span>
+              <span className="font-medium">{selectedDuration?.label}</span>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <span className="text-gray-400">Royalty (Basis Points):</span>
               <span className="font-medium">
-                {selectedDuration?.label}
+                {licensing.royaltyPercentage * 100} BPS
               </span>
             </div>
-            
+
             <div className="border-t border-gray-700 pt-4">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-gray-400">Platform Fee ({(100 - licensing.royaltyPercentage)}%):</span>
+                <span className="text-gray-400">
+                  Platform Fee ({100 - licensing.royaltyPercentage}%):
+                </span>
                 <span className="text-red-400">
-                  -{(licensing.fixedPrice * platformFee).toFixed(4)} {licensing.paymentToken}
+                  -{(licensing.fixedPrice * platformFee).toFixed(4)}{" "}
+                  {selectedToken?.symbol || "ETH"}
                 </span>
               </div>
-              
+
               <div className="flex justify-between items-center">
                 <span className="font-medium">Your Earnings:</span>
                 <span className="text-xl font-bold text-green-400">
-                  {creatorEarning.toFixed(4)} {licensing.paymentToken}
+                  {creatorEarning.toFixed(4)} {selectedToken?.symbol || "ETH"}
                 </span>
               </div>
             </div>
@@ -237,12 +331,13 @@ export default function LicensingForm({ data, onDataChange, onNext, onBack }: Li
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
-        
+
         <Button
           onClick={onNext}
-          className="bg-orange-500 hover:bg-orange-600"
+          disabled={!authenticated}
+          className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50"
         >
-          Review & Mint IpNFT
+          {authenticated ? "Review & Mint IpNFT" : "Connect Wallet to Continue"}
           <ArrowRight className="h-4 w-4 ml-2" />
         </Button>
       </div>

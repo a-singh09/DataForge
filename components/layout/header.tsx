@@ -20,9 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAuthState } from "@/hooks/useAuthState";
-import { useAuth } from "@/hooks/useAuth";
-import { AuthModal } from "@/components/auth/AuthModal";
+import { useAuthState, useAuth, CampModal } from "@campnetwork/origin/react";
 
 const navigation = [
   { name: "Marketplace", href: "/marketplace", icon: Search },
@@ -34,7 +32,7 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const { authenticated, loading } = useAuthState();
-  const { disconnect } = useAuth();
+  const auth = useAuth();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-gray-800/50 bg-gray-950/80 backdrop-blur-md">
@@ -75,7 +73,7 @@ export default function Header() {
               <div className="animate-pulse bg-gray-700 h-10 w-32 rounded-md"></div>
             ) : (
               <>
-                <AuthModal />
+                <CampModal />
                 {authenticated && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -106,7 +104,7 @@ export default function Header() {
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={disconnect}
+                        onClick={auth.disconnect}
                         className="cursor-pointer text-red-400"
                       >
                         <Wallet className="h-4 w-4 mr-2" />
@@ -161,7 +159,7 @@ export default function Header() {
                   <div className="animate-pulse bg-gray-700 h-10 w-full rounded-md"></div>
                 ) : (
                   <div className="space-y-4">
-                    <AuthModal />
+                    <CampModal />
                     {authenticated && (
                       <div className="space-y-2">
                         <Link
@@ -182,7 +180,7 @@ export default function Header() {
                         </Link>
                         <button
                           onClick={() => {
-                            disconnect();
+                            auth.disconnect();
                             setMobileMenuOpen(false);
                           }}
                           className="flex items-center space-x-2 text-sm font-medium text-red-400 hover:text-red-300"
