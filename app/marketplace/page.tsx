@@ -1,80 +1,134 @@
 "use client";
 
-import { useState } from 'react';
-import { Search, Filter, Grid, List, TrendingUp } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import DatasetCard from '@/components/marketplace/dataset-card';
-import FilterSidebar from '@/components/marketplace/filter-sidebar';
+import { useState } from "react";
+import { Search, Filter, Grid, List, TrendingUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import DatasetCard from "@/components/marketplace/dataset-card";
+import FilterSidebar from "@/components/marketplace/filter-sidebar";
 
-const mockDatasets = [
+import { IpNFTMetadata } from "@/types/marketplace";
+
+const mockDatasets: IpNFTMetadata[] = [
   {
-    id: '1',
-    title: 'Premium Photography Collection',
-    creator: '0x1234...5678',
-    creatorVerified: true,
-    type: 'image',
-    price: 0.5,
-    currency: 'ETH',
+    tokenId: BigInt(1),
+    title: "Premium Photography Collection",
+    description:
+      "High-quality nature photography dataset perfect for computer vision training.",
+    contentType: "image",
+    creator: {
+      address: "0x1234567890123456789012345678901234567890",
+      socialProfiles: {
+        twitter: "photographer_ai",
+      },
+      verified: true,
+    },
+    license: {
+      price: BigInt("500000000000000000"), // 0.5 ETH
+      duration: 365 * 24 * 60 * 60, // 1 year
+      royaltyBps: 500, // 5%
+      paymentToken: "0x0000000000000000000000000000000000000000",
+    },
+    contentHash: "QmHash1234567890abcdef",
+    uri: "ipfs://QmHash1234567890abcdef",
+    createdAt: Date.now() - 86400000,
+    tags: ["photography", "nature", "high-res"],
+    previewUrl:
+      "https://images.pexels.com/photos/1851415/pexels-photo-1851415.jpeg?auto=compress&cs=tinysrgb&w=400",
     samples: 15420,
     downloads: 89,
     rating: 4.8,
-    tags: ['photography', 'nature', 'high-res'],
-    previewUrl: 'https://images.pexels.com/photos/1851415/pexels-photo-1851415.jpeg?auto=compress&cs=tinysrgb&w=400',
-    description: 'High-quality nature photography dataset perfect for computer vision training.',
   },
   {
-    id: '2',
-    title: 'Social Media Text Dataset',
-    creator: '0x8765...4321',
-    creatorVerified: false,
-    type: 'text',
-    price: 0.3,
-    currency: 'ETH',
+    tokenId: BigInt(2),
+    title: "Social Media Text Dataset",
+    description: "Curated social media posts with sentiment analysis labels.",
+    contentType: "text",
+    creator: {
+      address: "0x8765432109876543210987654321098765432109",
+      socialProfiles: {},
+      verified: false,
+    },
+    license: {
+      price: BigInt("300000000000000000"), // 0.3 ETH
+      duration: 180 * 24 * 60 * 60, // 6 months
+      royaltyBps: 300, // 3%
+      paymentToken: "0x0000000000000000000000000000000000000000",
+    },
+    contentHash: "QmHash2345678901bcdefg",
+    uri: "ipfs://QmHash2345678901bcdefg",
+    createdAt: Date.now() - 172800000,
+    tags: ["social", "nlp", "sentiment"],
     samples: 50000,
     downloads: 156,
     rating: 4.6,
-    tags: ['social', 'nlp', 'sentiment'],
-    previewUrl: null,
-    description: 'Curated social media posts with sentiment analysis labels.',
   },
   {
-    id: '3',
-    title: 'Audio Music Samples',
-    creator: '0x9876...1234',
-    creatorVerified: true,
-    type: 'audio',
-    price: 0.8,
-    currency: 'ETH',
+    tokenId: BigInt(3),
+    title: "Audio Music Samples",
+    description: "Professional music samples for audio AI training.",
+    contentType: "audio",
+    creator: {
+      address: "0x9876543210987654321098765432109876543210",
+      socialProfiles: {
+        spotify: "ai_music_creator",
+      },
+      verified: true,
+    },
+    license: {
+      price: BigInt("800000000000000000"), // 0.8 ETH
+      duration: 730 * 24 * 60 * 60, // 2 years
+      royaltyBps: 750, // 7.5%
+      paymentToken: "0x0000000000000000000000000000000000000000",
+    },
+    contentHash: "QmHash3456789012cdefgh",
+    uri: "ipfs://QmHash3456789012cdefgh",
+    createdAt: Date.now() - 259200000,
+    tags: ["music", "audio", "synthetic"],
     samples: 3200,
     downloads: 45,
     rating: 4.9,
-    tags: ['music', 'audio', 'synthetic'],
-    previewUrl: null,
-    description: 'Professional music samples for audio AI training.',
   },
   {
-    id: '4',
-    title: 'Code Repository Dataset',
-    creator: '0x5432...8765',
-    creatorVerified: true,
-    type: 'code',
-    price: 1.2,
-    currency: 'ETH',
+    tokenId: BigInt(4),
+    title: "Code Repository Dataset",
+    description:
+      "Clean, documented code samples for AI code generation training.",
+    contentType: "code",
+    creator: {
+      address: "0x5432109876543210987654321098765432109876",
+      socialProfiles: {
+        twitter: "dev_ai_trainer",
+      },
+      verified: true,
+    },
+    license: {
+      price: BigInt("1200000000000000000"), // 1.2 ETH
+      duration: 365 * 24 * 60 * 60, // 1 year
+      royaltyBps: 600, // 6%
+      paymentToken: "0x0000000000000000000000000000000000000000",
+    },
+    contentHash: "QmHash4567890123defghi",
+    uri: "ipfs://QmHash4567890123defghi",
+    createdAt: Date.now() - 345600000,
+    tags: ["javascript", "python", "ml"],
     samples: 8750,
     downloads: 203,
     rating: 4.7,
-    tags: ['javascript', 'python', 'ml'],
-    previewUrl: null,
-    description: 'Clean, documented code samples for AI code generation training.',
-  }
+  },
 ];
 
 export default function MarketplacePage() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [sortBy, setSortBy] = useState('popularity');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [sortBy, setSortBy] = useState("popularity");
   const [showFilters, setShowFilters] = useState(false);
 
   return (
@@ -87,7 +141,8 @@ export default function MarketplacePage() {
               AI Training <span className="gradient-text">Datasets</span>
             </h1>
             <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-              Discover high-quality, licensed datasets from verified creators worldwide
+              Discover high-quality, licensed datasets from verified creators
+              worldwide
             </p>
           </div>
 
@@ -108,7 +163,9 @@ export default function MarketplacePage() {
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar Filters */}
-          <div className={`lg:w-80 ${showFilters ? 'block' : 'hidden lg:block'}`}>
+          <div
+            className={`lg:w-80 ${showFilters ? "block" : "hidden lg:block"}`}
+          >
             <FilterSidebar />
           </div>
 
@@ -135,17 +192,17 @@ export default function MarketplacePage() {
                 {/* View Mode Toggle */}
                 <div className="flex items-center bg-gray-800 rounded-lg p-1">
                   <Button
-                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                    variant={viewMode === "grid" ? "default" : "ghost"}
                     size="sm"
-                    onClick={() => setViewMode('grid')}
+                    onClick={() => setViewMode("grid")}
                     className="px-3"
                   >
                     <Grid className="h-4 w-4" />
                   </Button>
                   <Button
-                    variant={viewMode === 'list' ? 'default' : 'ghost'}
+                    variant={viewMode === "list" ? "default" : "ghost"}
                     size="sm"
-                    onClick={() => setViewMode('list')}
+                    onClick={() => setViewMode("list")}
                     className="px-3"
                   >
                     <List className="h-4 w-4" />
@@ -164,8 +221,12 @@ export default function MarketplacePage() {
                         Popularity
                       </div>
                     </SelectItem>
-                    <SelectItem value="price-low">Price: Low to High</SelectItem>
-                    <SelectItem value="price-high">Price: High to Low</SelectItem>
+                    <SelectItem value="price-low">
+                      Price: Low to High
+                    </SelectItem>
+                    <SelectItem value="price-high">
+                      Price: High to Low
+                    </SelectItem>
                     <SelectItem value="newest">Newest First</SelectItem>
                     <SelectItem value="rating">Highest Rated</SelectItem>
                   </SelectContent>
@@ -174,15 +235,17 @@ export default function MarketplacePage() {
             </div>
 
             {/* Dataset Grid */}
-            <div className={
-              viewMode === 'grid' 
-                ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6'
-                : 'space-y-4'
-            }>
+            <div
+              className={
+                viewMode === "grid"
+                  ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
+                  : "space-y-4"
+              }
+            >
               {mockDatasets.map((dataset) => (
-                <DatasetCard 
-                  key={dataset.id} 
-                  dataset={dataset} 
+                <DatasetCard
+                  key={dataset.id}
+                  dataset={dataset}
                   viewMode={viewMode}
                 />
               ))}

@@ -1,18 +1,18 @@
 "use client";
 
-import { useState } from 'react';
-import Image from 'next/image';
-import { 
-  Star, 
-  Download, 
-  Eye, 
-  Shield, 
+import { useState } from "react";
+import Image from "next/image";
+import {
+  Star,
+  Download,
+  Eye,
+  Shield,
   Clock,
   Tag,
-  ExternalLink
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+  ExternalLink,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -21,41 +21,32 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import DatasetPreview from "./dataset-preview";
 
-interface Dataset {
-  id: string;
-  title: string;
-  creator: string;
-  creatorVerified: boolean;
-  type: string;
-  price: number;
-  currency: string;
-  samples: number;
-  downloads: number;
-  rating: number;
-  tags: string[];
-  previewUrl?: string;
-  description: string;
-}
+import { IpNFTMetadata } from "@/types/marketplace";
 
 interface DatasetCardProps {
-  dataset: Dataset;
-  viewMode: 'grid' | 'list';
+  dataset: IpNFTMetadata;
+  viewMode: "grid" | "list";
 }
 
 const typeColors = {
-  image: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  text: 'bg-green-500/20 text-green-400 border-green-500/30',
-  audio: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-  video: 'bg-red-500/20 text-red-400 border-red-500/30',
-  code: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-  social: 'bg-pink-500/20 text-pink-400 border-pink-500/30',
+  image: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  text: "bg-green-500/20 text-green-400 border-green-500/30",
+  audio: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  video: "bg-red-500/20 text-red-400 border-red-500/30",
+  code: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  social: "bg-pink-500/20 text-pink-400 border-pink-500/30",
 };
 
 export default function DatasetCard({ dataset, viewMode }: DatasetCardProps) {
   const [showPreview, setShowPreview] = useState(false);
-  
-  if (viewMode === 'list') {
+
+  const formatPrice = (price: bigint) => {
+    return `${(Number(price) / 1e18).toFixed(3)} ETH`;
+  };
+
+  if (viewMode === "list") {
     return (
       <div className="glass rounded-xl p-6 hover:bg-white/10 transition-all duration-300">
         <div className="flex flex-col md:flex-row gap-6">
@@ -84,39 +75,45 @@ export default function DatasetCard({ dataset, viewMode }: DatasetCardProps) {
                   <h3 className="text-lg font-semibold text-white truncate">
                     {dataset.title}
                   </h3>
-                  {dataset.creatorVerified && (
+                  {dataset.creator.verified && (
                     <Shield className="h-4 w-4 text-blue-400 flex-shrink-0" />
                   )}
                 </div>
-                
+
                 <p className="text-sm text-gray-400 mb-3 line-clamp-2">
                   {dataset.description}
                 </p>
 
                 <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400">
-                  <Badge className={typeColors[dataset.type as keyof typeof typeColors] || typeColors.text}>
-                    {dataset.type}
+                  <Badge
+                    className={
+                      typeColors[
+                        dataset.contentType as keyof typeof typeColors
+                      ] || typeColors.text
+                    }
+                  >
+                    {dataset.contentType}
                   </Badge>
                   <span className="flex items-center gap-1">
                     <Star className="h-4 w-4 text-yellow-400" />
-                    {dataset.rating}
+                    {dataset.rating || 0}
                   </span>
                   <span className="flex items-center gap-1">
                     <Download className="h-4 w-4" />
-                    {dataset.downloads}
+                    {dataset.downloads || 0}
                   </span>
-                  <span>{dataset.samples.toLocaleString()} samples</span>
+                  <span>{(dataset.samples || 0).toLocaleString()} samples</span>
                 </div>
               </div>
 
               <div className="flex flex-col items-end gap-3 flex-shrink-0">
                 <div className="text-right">
                   <div className="text-xl font-bold text-orange-400">
-                    {dataset.price} {dataset.currency}
+                    {formatPrice(dataset.license.price)}
                   </div>
                   <div className="text-xs text-gray-500">per license</div>
                 </div>
-                
+
                 <div className="flex gap-2">
                   <Dialog>
                     <DialogTrigger asChild>
@@ -125,21 +122,21 @@ export default function DatasetCard({ dataset, viewMode }: DatasetCardProps) {
                         Preview
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-2xl">
-                      <DialogHeader>
-                        <DialogTitle>{dataset.title}</DialogTitle>
-                        <DialogDescription>
-                          Dataset preview and licensing information
-                        </DialogDescription>
-                      </DialogHeader>
-                      {/* Preview content would go here */}
-                      <div className="p-6 bg-gray-800 rounded-lg">
-                        <p>Dataset preview and metadata would be displayed here.</p>
-                      </div>
+                    <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+                      <DatasetPreview
+                        dataset={dataset}
+                        onLicense={() => {
+                          // Handle licensing logic
+                          console.log("License dataset:", dataset.tokenId);
+                        }}
+                      />
                     </DialogContent>
                   </Dialog>
-                  
-                  <Button size="sm" className="bg-orange-500 hover:bg-orange-600">
+
+                  <Button
+                    size="sm"
+                    className="bg-orange-500 hover:bg-orange-600"
+                  >
                     License Now
                   </Button>
                 </div>
@@ -168,15 +165,20 @@ export default function DatasetCard({ dataset, viewMode }: DatasetCardProps) {
             <Tag className="h-12 w-12 text-gray-400" />
           </div>
         )}
-        
+
         {/* Overlay badges */}
         <div className="absolute top-3 left-3">
-          <Badge className={typeColors[dataset.type as keyof typeof typeColors] || typeColors.text}>
-            {dataset.type}
+          <Badge
+            className={
+              typeColors[dataset.contentType as keyof typeof typeColors] ||
+              typeColors.text
+            }
+          >
+            {dataset.contentType}
           </Badge>
         </div>
-        
-        {dataset.creatorVerified && (
+
+        {dataset.creator.verified && (
           <div className="absolute top-3 right-3">
             <Shield className="h-5 w-5 text-blue-400" />
           </div>
@@ -191,19 +193,17 @@ export default function DatasetCard({ dataset, viewMode }: DatasetCardProps) {
                 Preview
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>{dataset.title}</DialogTitle>
-                <DialogDescription>
-                  Dataset preview and licensing information
-                </DialogDescription>
-              </DialogHeader>
-              <div className="p-6 bg-gray-800 rounded-lg">
-                <p>Dataset preview and metadata would be displayed here.</p>
-              </div>
+            <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+              <DatasetPreview
+                dataset={dataset}
+                onLicense={() => {
+                  // Handle licensing logic
+                  console.log("License dataset:", dataset.tokenId);
+                }}
+              />
             </DialogContent>
           </Dialog>
-          
+
           <Button size="sm" className="bg-orange-500 hover:bg-orange-600">
             <ExternalLink className="h-4 w-4 mr-1" />
             License
@@ -219,7 +219,7 @@ export default function DatasetCard({ dataset, viewMode }: DatasetCardProps) {
           </h3>
           <div className="text-right flex-shrink-0 ml-3">
             <div className="text-lg font-bold text-orange-400">
-              {dataset.price} {dataset.currency}
+              {formatPrice(dataset.license.price)}
             </div>
             <div className="text-xs text-gray-500">per license</div>
           </div>
@@ -244,14 +244,14 @@ export default function DatasetCard({ dataset, viewMode }: DatasetCardProps) {
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1">
               <Star className="h-4 w-4 text-yellow-400" />
-              {dataset.rating}
+              {dataset.rating || 0}
             </span>
             <span className="flex items-center gap-1">
               <Download className="h-4 w-4" />
-              {dataset.downloads}
+              {dataset.downloads || 0}
             </span>
           </div>
-          <span>{dataset.samples.toLocaleString()} samples</span>
+          <span>{(dataset.samples || 0).toLocaleString()} samples</span>
         </div>
       </div>
     </div>
