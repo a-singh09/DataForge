@@ -38,6 +38,11 @@ import {
 } from "./content-previews";
 import DatasetMetadata from "./dataset-metadata";
 import SampleContentDisplay from "./sample-content-display";
+import DatasetAccess from "./dataset-access";
+import LicenseRenewalModal from "./license-renewal-modal";
+import { useLicensing } from "@/hooks/useLicensing";
+import { useAuthState } from "@campnetwork/origin/react";
+import { toast } from "@/hooks/use-toast";
 
 interface DatasetPreviewProps {
   dataset: IpNFTMetadata;
@@ -70,6 +75,9 @@ export default function DatasetPreview({
 }: DatasetPreviewProps) {
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [showRenewalModal, setShowRenewalModal] = useState(false);
+  const { authenticated } = useAuthState();
+  const { checkAccess } = useLicensing();
 
   const TypeIcon = typeIcons[dataset.contentType];
   const formatPrice = (price: bigint) => {
@@ -95,6 +103,26 @@ export default function DatasetPreview({
     }
     const minutes = Math.floor(seconds / 60);
     return `${minutes} minute${minutes > 1 ? "s" : ""}`;
+  };
+
+  const handleRenewalSuccess = (
+    tokenId: bigint,
+    transactionHash: string,
+    periods: number,
+  ) => {
+    toast({
+      title: "License Renewed Successfully!",
+      description: `Extended access for ${periods} period${periods > 1 ? "s" : ""}. Transaction: ${transactionHash.slice(0, 10)}...`,
+    });
+    setShowRenewalModal(false);
+  };
+
+  const handleRenewalError = (error: Error) => {
+    toast({
+      title: "License Renewal Failed",
+      description: error.message,
+      variant: "destructive",
+    });
   };
 
   return (
@@ -201,6 +229,14 @@ export default function DatasetPreview({
           {/* Creator Profile */}
           <CreatorProfile creator={dataset.creator} />
 
+          {/* Access Control - Show if authenticated */}
+          {authenticated && (
+            <DatasetAccess
+              dataset={dataset}
+              onRenewLicense={() => setShowRenewalModal(true)}
+            />
+          )}
+
           {/* License Information */}
           <Card className="glass">
             <CardHeader>
@@ -278,6 +314,15 @@ export default function DatasetPreview({
       <div className="mt-8">
         <DatasetMetadata dataset={dataset} />
       </div>
+
+      {/* License Renewal Modal */}
+      <LicenseRenewalModal
+        isOpen={showRenewalModal}
+        onClose={() => setShowRenewalModal(false)}
+        dataset={dataset}
+        onSuccess={handleRenewalSuccess}
+        onError={handleRenewalError}
+      />
     </div>
   );
 }

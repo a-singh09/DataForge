@@ -22,6 +22,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import DatasetPreview from "./dataset-preview";
+import LicensePurchaseModal from "./license-purchase-modal";
+import { useLicensing } from "@/hooks/useLicensing";
+import { useAuthState } from "@campnetwork/origin/react";
+import { toast } from "@/hooks/use-toast";
 
 import { IpNFTMetadata } from "@/types/marketplace";
 
@@ -41,9 +45,40 @@ const typeColors = {
 
 export default function DatasetCard({ dataset, viewMode }: DatasetCardProps) {
   const [showPreview, setShowPreview] = useState(false);
+  const [showLicenseModal, setShowLicenseModal] = useState(false);
+  const { authenticated } = useAuthState();
+  const { purchaseLicense } = useLicensing();
 
   const formatPrice = (price: bigint) => {
     return `${(Number(price) / 1e18).toFixed(3)} ETH`;
+  };
+
+  const handleLicenseClick = () => {
+    if (!authenticated) {
+      toast({
+        title: "Authentication Required",
+        description: "Please connect your wallet to purchase a license.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setShowLicenseModal(true);
+  };
+
+  const handleLicenseSuccess = (tokenId: bigint, transactionHash: string) => {
+    toast({
+      title: "License Purchased Successfully!",
+      description: `You now have access to ${dataset.title}. Transaction: ${transactionHash.slice(0, 10)}...`,
+    });
+    setShowLicenseModal(false);
+  };
+
+  const handleLicenseError = (error: Error) => {
+    toast({
+      title: "License Purchase Failed",
+      description: error.message,
+      variant: "destructive",
+    });
   };
 
   if (viewMode === "list") {
@@ -136,6 +171,7 @@ export default function DatasetCard({ dataset, viewMode }: DatasetCardProps) {
                   <Button
                     size="sm"
                     className="bg-orange-500 hover:bg-orange-600"
+                    onClick={handleLicenseClick}
                   >
                     License Now
                   </Button>
@@ -204,7 +240,11 @@ export default function DatasetCard({ dataset, viewMode }: DatasetCardProps) {
             </DialogContent>
           </Dialog>
 
-          <Button size="sm" className="bg-orange-500 hover:bg-orange-600">
+          <Button
+            size="sm"
+            className="bg-orange-500 hover:bg-orange-600"
+            onClick={handleLicenseClick}
+          >
             <ExternalLink className="h-4 w-4 mr-1" />
             License
           </Button>
@@ -254,6 +294,15 @@ export default function DatasetCard({ dataset, viewMode }: DatasetCardProps) {
           <span>{(dataset.samples || 0).toLocaleString()} samples</span>
         </div>
       </div>
+
+      {/* License Purchase Modal */}
+      <LicensePurchaseModal
+        isOpen={showLicenseModal}
+        onClose={() => setShowLicenseModal(false)}
+        dataset={dataset}
+        onSuccess={handleLicenseSuccess}
+        onError={handleLicenseError}
+      />
     </div>
   );
 }
