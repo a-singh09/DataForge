@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from 'react';
-import { 
-  TrendingUp, 
-  DollarSign, 
-  FileText, 
+import { useState } from "react";
+import {
+  TrendingUp,
+  DollarSign,
+  FileText,
   Calendar,
   Eye,
   Edit,
@@ -14,55 +14,86 @@ import {
   Activity,
   BarChart3,
   PieChart,
-  Users
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import RevenueChart from '@/components/dashboard/revenue-chart';
-import ContentTable from '@/components/dashboard/content-table';
-import ActivityFeed from '@/components/dashboard/activity-feed';
-import AnalyticsInsights from '@/components/dashboard/analytics-insights';
-
-const keyMetrics = [
-  {
-    title: 'Total Earnings',
-    value: '$12,847.32',
-    change: '+23.5%',
-    changeType: 'positive' as const,
-    icon: DollarSign,
-    color: 'text-green-400'
-  },
-  {
-    title: 'Active Licenses',
-    value: '89',
-    change: '+12',
-    changeType: 'positive' as const,
-    icon: FileText,
-    color: 'text-blue-400'
-  },
-  {
-    title: 'Content Minted',
-    value: '156',
-    change: '+8',
-    changeType: 'positive' as const,
-    icon: Eye,
-    color: 'text-purple-400'
-  },
-  {
-    title: 'Monthly Revenue',
-    value: '$3,247.89',
-    change: '+18.2%',
-    changeType: 'positive' as const,
-    icon: TrendingUp,
-    color: 'text-orange-400'
-  }
-];
+  Users,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import RevenueChart from "@/components/dashboard/revenue-chart";
+import ContentTable from "@/components/dashboard/content-table";
+import ActivityFeed from "@/components/dashboard/activity-feed";
+import AnalyticsInsights from "@/components/dashboard/analytics-insights";
+import LicensingTimeline from "@/components/dashboard/licensing-timeline";
+import PopularContent from "@/components/dashboard/popular-content";
+import TransactionHistory from "@/components/dashboard/transaction-history";
+import useCreatorAnalytics from "@/hooks/useCreatorAnalytics";
+import { formatEther } from "viem";
 
 export default function DashboardPage() {
-  const [timeframe, setTimeframe] = useState('30D');
+  const [timeframe, setTimeframe] = useState("30D");
+  const {
+    revenueData,
+    uploads,
+    usageStats,
+    isLoading: analyticsLoading,
+    getTotalEarnings,
+    getActiveLicenses,
+    getTotalContent,
+  } = useCreatorAnalytics();
+
+  // Calculate dynamic key metrics from Origin SDK data
+  const keyMetrics = [
+    {
+      title: "Total Earnings",
+      value: analyticsLoading
+        ? "..."
+        : `${Number(formatEther(getTotalEarnings())).toFixed(4)} ETH`,
+      change: "+23.5%", // This would be calculated from historical data
+      changeType: "positive" as const,
+      icon: DollarSign,
+      color: "text-green-400",
+    },
+    {
+      title: "Active Licenses",
+      value: analyticsLoading ? "..." : getActiveLicenses().toString(),
+      change: "+12",
+      changeType: "positive" as const,
+      icon: FileText,
+      color: "text-blue-400",
+    },
+    {
+      title: "Content Minted",
+      value: analyticsLoading ? "..." : getTotalContent().toString(),
+      change: "+8",
+      changeType: "positive" as const,
+      icon: Eye,
+      color: "text-purple-400",
+    },
+    {
+      title: "Origin Multiplier",
+      value: analyticsLoading ? "..." : `${usageStats?.user?.multiplier || 1}x`,
+      change: usageStats?.user?.active ? "Active" : "Inactive",
+      changeType: usageStats?.user?.active
+        ? ("positive" as const)
+        : ("neutral" as const),
+      icon: TrendingUp,
+      color: "text-orange-400",
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-950">
@@ -75,10 +106,10 @@ export default function DashboardPage() {
                 Creator <span className="gradient-text">Dashboard</span>
               </h1>
               <p className="text-xl text-gray-300">
-                Track your content performance and earnings
+                Track your content performance and earnings with Origin SDK
               </p>
             </div>
-            
+
             <div className="flex items-center space-x-4">
               <Select value={timeframe} onValueChange={setTimeframe}>
                 <SelectTrigger className="w-32">
@@ -91,7 +122,7 @@ export default function DashboardPage() {
                   <SelectItem value="1Y">1 Year</SelectItem>
                 </SelectContent>
               </Select>
-              
+
               <Button className="bg-orange-500 hover:bg-orange-600">
                 <FileText className="h-4 w-4 mr-2" />
                 Upload Content
@@ -107,20 +138,35 @@ export default function DashboardPage() {
           {keyMetrics.map((metric, index) => {
             const Icon = metric.icon;
             return (
-              <Card key={metric.title} className="glass border-gray-800 hover:bg-white/5 transition-all duration-300">
+              <Card
+                key={metric.title}
+                className="glass border-gray-800 hover:bg-white/5 transition-all duration-300"
+              >
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-gray-400 text-sm font-medium">{metric.title}</p>
-                      <p className="text-2xl font-bold text-white mt-2">{metric.value}</p>
-                      <div className={`flex items-center mt-2 text-sm ${
-                        metric.changeType === 'positive' ? 'text-green-400' : 'text-red-400'
-                      }`}>
+                      <p className="text-gray-400 text-sm font-medium">
+                        {metric.title}
+                      </p>
+                      <p className="text-2xl font-bold text-white mt-2">
+                        {metric.value}
+                      </p>
+                      <div
+                        className={`flex items-center mt-2 text-sm ${
+                          metric.changeType === "positive"
+                            ? "text-green-400"
+                            : metric.changeType === "neutral"
+                              ? "text-gray-400"
+                              : "text-red-400"
+                        }`}
+                      >
                         <TrendingUp className="h-4 w-4 mr-1" />
                         {metric.change}
                       </div>
                     </div>
-                    <div className={`h-12 w-12 rounded-lg bg-gray-800 flex items-center justify-center`}>
+                    <div
+                      className={`h-12 w-12 rounded-lg bg-gray-800 flex items-center justify-center`}
+                    >
                       <Icon className={`h-6 w-6 ${metric.color}`} />
                     </div>
                   </div>
@@ -132,11 +178,13 @@ export default function DashboardPage() {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="overview" className="space-y-8">
-          <TabsList className="grid w-full grid-cols-4 lg:w-96">
+          <TabsList className="grid w-full grid-cols-6 lg:w-[600px]">
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="content">Content</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger value="content">Content</TabsTrigger>
+            <TabsTrigger value="transactions">Transactions</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
+            <TabsTrigger value="insights">Insights</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-8">
@@ -145,25 +193,42 @@ export default function DashboardPage() {
               <div className="lg:col-span-2">
                 <RevenueChart timeframe={timeframe} />
               </div>
-              
+
               {/* Activity Feed */}
               <div>
                 <ActivityFeed />
               </div>
             </div>
-          </TabsContent>
 
-          <TabsContent value="content">
-            <ContentTable />
+            {/* Popular Content Overview */}
+            <div className="grid lg:grid-cols-2 gap-8">
+              <PopularContent />
+              <LicensingTimeline />
+            </div>
           </TabsContent>
 
           <TabsContent value="analytics">
             <AnalyticsInsights />
           </TabsContent>
 
+          <TabsContent value="content">
+            <ContentTable />
+          </TabsContent>
+
+          <TabsContent value="transactions">
+            <TransactionHistory />
+          </TabsContent>
+
           <TabsContent value="activity">
             <div className="max-w-4xl">
               <ActivityFeed detailed />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="insights" className="space-y-8">
+            <div className="grid gap-8">
+              <PopularContent />
+              <LicensingTimeline />
             </div>
           </TabsContent>
         </Tabs>
