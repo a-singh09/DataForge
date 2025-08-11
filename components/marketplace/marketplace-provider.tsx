@@ -99,7 +99,7 @@ export function MarketplaceProvider({
     data: activeQuery.data,
     totalCount:
       paginationMode === "pages"
-        ? paginatedQuery.totalCount
+        ? paginatedQuery.totalCount || 0
         : infiniteQuery.data.length,
     isLoading: activeQuery.isLoading,
     isError: activeQuery.isError,

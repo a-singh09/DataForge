@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Filter, Grid, List, TrendingUp } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Search, Filter, Grid, List, TrendingUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,123 +13,100 @@ import {
 } from "@/components/ui/select";
 import DatasetCard from "@/components/marketplace/dataset-card";
 import FilterSidebar from "@/components/marketplace/filter-sidebar";
+import { MarketplaceProvider } from "@/components/marketplace/marketplace-provider";
+import { useMarketplaceData } from "@/hooks/useMarketplaceData";
+import { useAuthState } from "@campnetwork/origin/react";
+import { toast } from "@/hooks/use-toast";
 
-import { IpNFTMetadata } from "@/types/marketplace";
+import { MarketplaceFilters } from "@/types/marketplace";
 
-const mockDatasets: IpNFTMetadata[] = [
-  {
-    tokenId: BigInt(1),
-    title: "Premium Photography Collection",
-    description:
-      "High-quality nature photography dataset perfect for computer vision training.",
-    contentType: "image",
-    creator: {
-      address: "0x1234567890123456789012345678901234567890",
-      socialProfiles: {
-        twitter: "photographer_ai",
-      },
-      verified: true,
-    },
-    license: {
-      price: BigInt("500000000000000000"), // 0.5 ETH
-      duration: 365 * 24 * 60 * 60, // 1 year
-      royaltyBps: 500, // 5%
-      paymentToken: "0x0000000000000000000000000000000000000000",
-    },
-    contentHash: "QmHash1234567890abcdef",
-    uri: "ipfs://QmHash1234567890abcdef",
-    createdAt: Date.now() - 86400000,
-    tags: ["photography", "nature", "high-res"],
-    previewUrl:
-      "https://images.pexels.com/photos/1851415/pexels-photo-1851415.jpeg?auto=compress&cs=tinysrgb&w=400",
-    samples: 15420,
-    downloads: 89,
-    rating: 4.8,
-  },
-  {
-    tokenId: BigInt(2),
-    title: "Social Media Text Dataset",
-    description: "Curated social media posts with sentiment analysis labels.",
-    contentType: "text",
-    creator: {
-      address: "0x8765432109876543210987654321098765432109",
-      socialProfiles: {},
-      verified: false,
-    },
-    license: {
-      price: BigInt("300000000000000000"), // 0.3 ETH
-      duration: 180 * 24 * 60 * 60, // 6 months
-      royaltyBps: 300, // 3%
-      paymentToken: "0x0000000000000000000000000000000000000000",
-    },
-    contentHash: "QmHash2345678901bcdefg",
-    uri: "ipfs://QmHash2345678901bcdefg",
-    createdAt: Date.now() - 172800000,
-    tags: ["social", "nlp", "sentiment"],
-    samples: 50000,
-    downloads: 156,
-    rating: 4.6,
-  },
-  {
-    tokenId: BigInt(3),
-    title: "Audio Music Samples",
-    description: "Professional music samples for audio AI training.",
-    contentType: "audio",
-    creator: {
-      address: "0x9876543210987654321098765432109876543210",
-      socialProfiles: {
-        spotify: "ai_music_creator",
-      },
-      verified: true,
-    },
-    license: {
-      price: BigInt("800000000000000000"), // 0.8 ETH
-      duration: 730 * 24 * 60 * 60, // 2 years
-      royaltyBps: 750, // 7.5%
-      paymentToken: "0x0000000000000000000000000000000000000000",
-    },
-    contentHash: "QmHash3456789012cdefgh",
-    uri: "ipfs://QmHash3456789012cdefgh",
-    createdAt: Date.now() - 259200000,
-    tags: ["music", "audio", "synthetic"],
-    samples: 3200,
-    downloads: 45,
-    rating: 4.9,
-  },
-  {
-    tokenId: BigInt(4),
-    title: "Code Repository Dataset",
-    description:
-      "Clean, documented code samples for AI code generation training.",
-    contentType: "code",
-    creator: {
-      address: "0x5432109876543210987654321098765432109876",
-      socialProfiles: {
-        twitter: "dev_ai_trainer",
-      },
-      verified: true,
-    },
-    license: {
-      price: BigInt("1200000000000000000"), // 1.2 ETH
-      duration: 365 * 24 * 60 * 60, // 1 year
-      royaltyBps: 600, // 6%
-      paymentToken: "0x0000000000000000000000000000000000000000",
-    },
-    contentHash: "QmHash4567890123defghi",
-    uri: "ipfs://QmHash4567890123defghi",
-    createdAt: Date.now() - 345600000,
-    tags: ["javascript", "python", "ml"],
-    samples: 8750,
-    downloads: 203,
-    rating: 4.7,
-  },
-];
-
-export default function MarketplacePage() {
+function MarketplaceContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [sortBy, setSortBy] = useState("popularity");
+  const [sortBy, setSortBy] = useState<MarketplaceFilters["sortBy"]>("popular");
   const [showFilters, setShowFilters] = useState(false);
+  const { authenticated } = useAuthState();
+
+  // Build filters from current state
+  const filters = useMemo<Partial<MarketplaceFilters>>(
+    () => ({
+      searchQuery: searchQuery.trim() || undefined,
+      sortBy,
+    }),
+    [searchQuery, sortBy],
+  );
+
+  // Fetch marketplace data using the real hooks
+  const {
+    data: datasets,
+    totalCount,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useMarketplaceData(filters, 20);
+
+  // Fetch trending datasets for the hero section (currently unused but ready for future features)
+  // const { data: trendingDatasets, isLoading: isTrendingLoading } = useTrendingIpNFTs(6);
+
+  // Handle authentication requirement
+  if (!authenticated) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">Authentication Required</h2>
+          <p className="text-gray-400 mb-6">
+            Please connect your wallet to access the marketplace
+          </p>
+          <Button
+            onClick={() =>
+              toast({
+                title: "Connect Wallet",
+                description:
+                  "Use the connect button in the navigation to get started",
+              })
+            }
+          >
+            Connect Wallet
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle loading state
+  if (isLoading && datasets.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-gray-400">Loading marketplace data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle error state
+  if (isError) {
+    console.error("Marketplace error:", error);
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4 text-red-400">
+            Error Loading Data
+          </h2>
+          <p className="text-gray-400 mb-6">
+            {error?.message || "Failed to load marketplace data"}
+          </p>
+          <div className="text-xs text-gray-500 mb-4 max-w-md">
+            This might be because no Origin uploads were found. The marketplace
+            will show mock data as a fallback.
+          </div>
+          <Button onClick={() => refetch()}>Try Again</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-950">
@@ -183,9 +160,7 @@ export default function MarketplacePage() {
                   <Filter className="h-4 w-4 mr-2" />
                   Filters
                 </Button>
-                <p className="text-gray-400">
-                  {mockDatasets.length} datasets found
-                </p>
+                <p className="text-gray-400">{totalCount} datasets found</p>
               </div>
 
               <div className="flex items-center gap-4">
@@ -210,21 +185,26 @@ export default function MarketplacePage() {
                 </div>
 
                 {/* Sort Dropdown */}
-                <Select value={sortBy} onValueChange={setSortBy}>
+                <Select
+                  value={sortBy}
+                  onValueChange={(value) =>
+                    setSortBy(value as MarketplaceFilters["sortBy"])
+                  }
+                >
                   <SelectTrigger className="w-48">
                     <SelectValue placeholder="Sort by" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="popularity">
+                    <SelectItem value="popular">
                       <div className="flex items-center">
                         <TrendingUp className="h-4 w-4 mr-2" />
-                        Popularity
+                        Popular
                       </div>
                     </SelectItem>
-                    <SelectItem value="price-low">
+                    <SelectItem value="price_low">
                       Price: Low to High
                     </SelectItem>
-                    <SelectItem value="price-high">
+                    <SelectItem value="price_high">
                       Price: High to Low
                     </SelectItem>
                     <SelectItem value="newest">Newest First</SelectItem>
@@ -235,31 +215,75 @@ export default function MarketplacePage() {
             </div>
 
             {/* Dataset Grid */}
-            <div
-              className={
-                viewMode === "grid"
-                  ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
-                  : "space-y-4"
-              }
-            >
-              {mockDatasets.map((dataset) => (
-                <DatasetCard
-                  key={dataset.id}
-                  dataset={dataset}
-                  viewMode={viewMode}
-                />
-              ))}
-            </div>
+            {datasets.length > 0 ? (
+              <div
+                className={
+                  viewMode === "grid"
+                    ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
+                    : "space-y-4"
+                }
+              >
+                {datasets.map((dataset) => (
+                  <DatasetCard
+                    key={dataset.tokenId.toString()}
+                    dataset={dataset}
+                    viewMode={viewMode}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-gray-400 text-lg mb-4">No datasets found</p>
+                <p className="text-gray-500">
+                  Try adjusting your search or filters to find more datasets
+                </p>
+              </div>
+            )}
 
-            {/* Load More */}
-            <div className="text-center mt-12">
-              <Button variant="outline" size="lg">
-                Load More Datasets
-              </Button>
-            </div>
+            {/* Load More - Only show if there are more items */}
+            {datasets.length > 0 && datasets.length < totalCount && (
+              <div className="text-center mt-12">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => {
+                    // This would typically load more data
+                    // For now, we'll show a message about pagination
+                    toast({
+                      title: "Load More",
+                      description:
+                        "Pagination will be implemented with infinite scroll",
+                    });
+                  }}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    "Load More Datasets"
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function MarketplacePage() {
+  return (
+    <MarketplaceProvider
+      initialFilters={{}}
+      initialViewMode="grid"
+      initialPaginationMode="infinite"
+      itemsPerPage={20}
+    >
+      <MarketplaceContent />
+    </MarketplaceProvider>
   );
 }

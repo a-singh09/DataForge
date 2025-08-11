@@ -1,58 +1,71 @@
 "use client";
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import { 
-  Image, 
-  FileText, 
-  Music, 
-  Video, 
-  Code, 
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { useMarketplaceContext } from "./marketplace-provider";
+import {
+  Image,
+  FileText,
+  Music,
+  Video,
+  Code,
   Hash,
   Shield,
   Clock,
-  RotateCcw
-} from 'lucide-react';
+  RotateCcw,
+} from "lucide-react";
 
 const contentTypes = [
-  { id: 'image', label: 'Images', icon: Image, count: 1240 },
-  { id: 'text', label: 'Text', icon: FileText, count: 890 },
-  { id: 'audio', label: 'Audio', icon: Music, count: 340 },
-  { id: 'video', label: 'Video', icon: Video, count: 180 },
-  { id: 'code', label: 'Code', icon: Code, count: 420 },
-  { id: 'social', label: 'Social', icon: Hash, count: 670 },
+  { id: "image", label: "Images", icon: Image },
+  { id: "text", label: "Text", icon: FileText },
+  { id: "audio", label: "Audio", icon: Music },
+  { id: "video", label: "Video", icon: Video },
+  { id: "code", label: "Code", icon: Code },
+  { id: "social", label: "Social", icon: Hash },
 ];
 
 const licenseDurations = [
-  { id: '30d', label: '30 Days', count: 156 },
-  { id: '90d', label: '90 Days', count: 234 },
-  { id: '1y', label: '1 Year', count: 445 },
-  { id: 'lifetime', label: 'Lifetime', count: 89 },
+  { id: "30d", label: "30 Days" },
+  { id: "90d", label: "90 Days" },
+  { id: "1y", label: "1 Year" },
+  { id: "lifetime", label: "Lifetime" },
 ];
 
 const uploadTimes = [
-  { id: '24h', label: 'Last 24 hours', count: 23 },
-  { id: '7d', label: 'Last 7 days', count: 156 },
-  { id: '30d', label: 'Last 30 days', count: 445 },
-  { id: '90d', label: 'Last 90 days', count: 789 },
+  { id: "24h", label: "Last 24 hours" },
+  { id: "7d", label: "Last 7 days" },
+  { id: "30d", label: "Last 30 days" },
+  { id: "90d", label: "Last 90 days" },
 ];
 
 export default function FilterSidebar() {
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
-  const [priceRange, setPriceRange] = useState([0, 5]);
-  const [verifiedOnly, setVerifiedOnly] = useState(false);
-  const [selectedDurations, setSelectedDurations] = useState<string[]>([]);
-  const [selectedUploadTime, setSelectedUploadTime] = useState<string>('');
+  const { filters, updateFilters, clearFilters } = useMarketplaceContext();
+
+  const [selectedTypes, setSelectedTypes] = useState<string[]>(
+    filters.contentTypes || [],
+  );
+  const [priceRange, setPriceRange] = useState<[number, number]>(
+    filters.priceRange || [0, 5],
+  );
+  const [verifiedOnly, setVerifiedOnly] = useState(
+    filters.verifiedOnly || false,
+  );
+  const [selectedDurations, setSelectedDurations] = useState<string[]>(
+    filters.licenseDurations || [],
+  );
+  const [selectedUploadTime, setSelectedUploadTime] = useState<string>(
+    filters.uploadTimeframe || "",
+  );
 
   const handleTypeChange = (typeId: string, checked: boolean) => {
     if (checked) {
       setSelectedTypes([...selectedTypes, typeId]);
     } else {
-      setSelectedTypes(selectedTypes.filter(id => id !== typeId));
+      setSelectedTypes(selectedTypes.filter((id) => id !== typeId));
     }
   };
 
@@ -60,7 +73,7 @@ export default function FilterSidebar() {
     if (checked) {
       setSelectedDurations([...selectedDurations, durationId]);
     } else {
-      setSelectedDurations(selectedDurations.filter(id => id !== durationId));
+      setSelectedDurations(selectedDurations.filter((id) => id !== durationId));
     }
   };
 
@@ -69,8 +82,28 @@ export default function FilterSidebar() {
     setPriceRange([0, 5]);
     setVerifiedOnly(false);
     setSelectedDurations([]);
-    setSelectedUploadTime('');
+    setSelectedUploadTime("");
+    clearFilters();
   };
+
+  const applyFilters = () => {
+    updateFilters({
+      contentTypes: selectedTypes,
+      priceRange,
+      verifiedOnly,
+      licenseDurations: selectedDurations,
+      uploadTimeframe: selectedUploadTime,
+    });
+  };
+
+  // Update local state when context filters change
+  useEffect(() => {
+    setSelectedTypes(filters.contentTypes || []);
+    setPriceRange(filters.priceRange || [0, 5]);
+    setVerifiedOnly(filters.verifiedOnly || false);
+    setSelectedDurations(filters.licenseDurations || []);
+    setSelectedUploadTime(filters.uploadTimeframe || "");
+  }, [filters]);
 
   return (
     <div className="glass rounded-xl p-6">
@@ -101,19 +134,16 @@ export default function FilterSidebar() {
                 <Checkbox
                   id={type.id}
                   checked={selectedTypes.includes(type.id)}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked) =>
                     handleTypeChange(type.id, checked as boolean)
                   }
                 />
-                <Label 
-                  htmlFor={type.id} 
+                <Label
+                  htmlFor={type.id}
                   className="flex items-center space-x-2 cursor-pointer flex-1"
                 >
                   <Icon className="h-4 w-4" />
                   <span>{type.label}</span>
-                  <span className="text-gray-500 text-sm ml-auto">
-                    ({type.count})
-                  </span>
                 </Label>
               </div>
             );
@@ -152,7 +182,10 @@ export default function FilterSidebar() {
             checked={verifiedOnly}
             onCheckedChange={(checked) => setVerifiedOnly(checked as boolean)}
           />
-          <Label htmlFor="verified" className="flex items-center space-x-2 cursor-pointer">
+          <Label
+            htmlFor="verified"
+            className="flex items-center space-x-2 cursor-pointer"
+          >
             <Shield className="h-4 w-4 text-blue-400" />
             <span>Verified Creators Only</span>
           </Label>
@@ -173,18 +206,15 @@ export default function FilterSidebar() {
               <Checkbox
                 id={duration.id}
                 checked={selectedDurations.includes(duration.id)}
-                onCheckedChange={(checked) => 
+                onCheckedChange={(checked) =>
                   handleDurationChange(duration.id, checked as boolean)
                 }
               />
-              <Label 
-                htmlFor={duration.id} 
+              <Label
+                htmlFor={duration.id}
                 className="cursor-pointer flex-1 flex justify-between"
               >
                 <span>{duration.label}</span>
-                <span className="text-gray-500 text-sm">
-                  ({duration.count})
-                </span>
               </Label>
             </div>
           ))}
@@ -202,18 +232,15 @@ export default function FilterSidebar() {
               <Checkbox
                 id={time.id}
                 checked={selectedUploadTime === time.id}
-                onCheckedChange={(checked) => 
-                  setSelectedUploadTime(checked ? time.id : '')
+                onCheckedChange={(checked) =>
+                  setSelectedUploadTime(checked ? time.id : "")
                 }
               />
-              <Label 
-                htmlFor={time.id} 
+              <Label
+                htmlFor={time.id}
                 className="cursor-pointer flex-1 flex justify-between"
               >
                 <span>{time.label}</span>
-                <span className="text-gray-500 text-sm">
-                  ({time.count})
-                </span>
               </Label>
             </div>
           ))}
@@ -221,7 +248,10 @@ export default function FilterSidebar() {
       </div>
 
       {/* Apply Filters Button */}
-      <Button className="w-full bg-orange-500 hover:bg-orange-600 text-white">
+      <Button
+        className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+        onClick={applyFilters}
+      >
         Apply Filters
       </Button>
     </div>
