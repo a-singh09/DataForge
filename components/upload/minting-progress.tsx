@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth, useAuthState } from "@campnetwork/origin/react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -64,6 +64,9 @@ export default function MintingProgress({
 }: MintingProgressProps) {
   const { authenticated } = useAuthState();
   const auth = useAuth();
+  const startedRef = useRef(false);
+  const initTimerRef = useRef<number | null>(null);
+  const originReady = !!auth?.origin;
 
   const [mintingState, setMintingState] = useState<MintingState>({
     currentStep: 0,
@@ -178,92 +181,60 @@ export default function MintingProgress({
 
       let tokenId: string;
 
-      // Add retry logic for API failures
-      const retryMinting = async (attempt: number = 1): Promise<string> => {
-        try {
-          if (!files.length) {
-            throw new Error("No files to mint");
-          }
+      // Single-attempt minting (no retries)
+      if (!files.length) {
+        throw new Error("No files to mint");
+      }
 
-          // File minting - mint the first file
-          const file = files[0];
+      // File minting - mint the first file
+      const fileForMint = files[0];
 
-          // Ensure we have proper file metadata including name and type
-          const fileMetadata = {
-            ...metadata,
-            fileName: file.name,
-            fileType: file.type,
-            fileSize: file.size,
-            // Add any additional metadata from the form
-            title: metadata.title || file.name,
-            description: metadata.description || `File: ${file.name}`,
-            category: metadata.category || "Other",
-            tags: metadata.tags || [],
-          };
+      // Ensure we have proper file metadata including name and type
+      const fileMetadata = {
+        ...metadata,
+        fileName: fileForMint.name,
+        fileType: fileForMint.type,
+        fileSize: fileForMint.size,
+        // Add any additional metadata from the form
+        title: metadata.title || fileForMint.name,
+        description: metadata.description || `File: ${fileForMint.name}`,
+        category: metadata.category || "Other",
+        tags: metadata.tags || [],
+      } as Record<string, unknown>;
 
-          console.log(`Attempting file minting (attempt ${attempt})...`, {
-            fileName: file.name,
-            fileType: file.type,
-            fileSize: file.size,
-            fileMetadata,
-            licenseTerms,
-          });
+      console.log("Attempting file minting...", {
+        fileName: fileForMint.name,
+        fileType: fileForMint.type,
+        fileSize: fileForMint.size,
+        fileMetadata,
+        licenseTerms,
+      });
 
-          console.log("File object details:", {
-            name: file.name,
-            type: file.type,
-            size: file.size,
-            lastModified: file.lastModified,
-            constructor: file.constructor.name,
-          });
+      console.log("File object details:", {
+        name: fileForMint.name,
+        type: fileForMint.type,
+        size: fileForMint.size,
+        lastModified: fileForMint.lastModified,
+        constructor: fileForMint.constructor.name,
+      });
 
-          return await auth.origin.mintFile(
-            file,
-            fileMetadata,
-            licenseTerms,
-            undefined, // no parent
-            {
-              progressCallback: (percent) => {
-                console.log(`Upload progress: ${percent}%`);
-              },
-            },
-          );
-        } catch (error: any) {
-          console.error(`Minting attempt ${attempt} failed:`, error);
-          console.error("Full error details:", {
-            message: error.message,
-            stack: error.stack,
-            name: error.name,
-          });
+      const mintedTokenId = await (auth.origin!).mintFile(
+        fileForMint as File,
+        fileMetadata,
+        licenseTerms as any,
+        undefined, // no parent
+        {
+          progressCallback: (percent: number) => {
+            console.log(`Upload progress: ${percent}%`);
+          },
+        },
+      );
 
-          // Check if it's a server error that might be retryable
-          const isRetryableError =
-            error.message?.includes("500") ||
-            error.message?.includes("Failed to upload") ||
-            error.message?.includes("Failed to load resource") ||
-            error.message?.includes("upload-url") ||
-            error.message?.includes("update-status");
+      if (!mintedTokenId) {
+        throw new Error("Minting did not return a token ID");
+      }
 
-          if (attempt < 3 && isRetryableError) {
-            console.log(
-              `Retrying minting in ${attempt * 2} seconds... (attempt ${attempt + 1}/3)`,
-            );
-            await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
-            return retryMinting(attempt + 1);
-          }
-
-          // If all retries failed, provide more context
-          if (isRetryableError) {
-            throw new Error(
-              `Origin SDK backend services are currently unavailable after ${attempt} attempts. The upload-url and update-status endpoints are returning 500 errors. This appears to be a temporary infrastructure issue with the Origin SDK servers. Please try again later.`,
-            );
-          }
-
-          throw error;
-        }
-      };
-
-      tokenId = await retryMinting();
+      tokenId = mintedTokenId;
 
       // Step 3: Minting IpNFT (blockchain transaction)
       setMintingState((prev) => ({ ...prev, currentStep: 2, tokenId }));
@@ -323,7 +294,7 @@ export default function MintingProgress({
   useEffect(() => {
     console.log("Minting component mounted:", {
       authenticated,
-      hasOrigin: !!auth?.origin,
+      hasOrigin: originReady,
       hasAuth: !!auth,
     });
 
@@ -345,53 +316,50 @@ export default function MintingProgress({
       return;
     }
 
-    // Wait for Origin SDK to be initialized
-    const waitForOriginSDK = async () => {
-      let attempts = 0;
-      const maxAttempts = 30; // Wait up to 15 seconds (30 * 500ms)
+    // Prevent re-entrancy
+    if (startedRef.current) {
+      return;
+    }
 
-      while (attempts < maxAttempts) {
-        console.log(
-          `Checking Origin SDK initialization (attempt ${attempts + 1}/${maxAttempts})...`,
-          {
-            hasAuth: !!auth,
-            hasOrigin: !!auth?.origin,
-            authKeys: auth ? Object.keys(auth) : [],
-          },
-        );
+    // Single check with a short grace delay (no repeated attempts)
+    if (originReady) {
+      console.log("Origin SDK is ready, starting minting process...");
+      setMintingState((prev) => ({ ...prev, isInitializing: false }));
+      setTimeout(() => {
+        performMinting();
+      }, 500);
+      startedRef.current = true;
+      return;
+    }
 
-        if (auth?.origin) {
-          console.log("Origin SDK is ready, starting minting process...");
+    // One short delayed check to allow last-moment initialization
+    if (initTimerRef.current == null) {
+      initTimerRef.current = window.setTimeout(() => {
+        if (startedRef.current) return;
+        if (!!auth?.origin) {
+          console.log("Origin SDK became ready, starting minting process...");
           setMintingState((prev) => ({ ...prev, isInitializing: false }));
-          // Add a small delay to ensure everything is properly initialized
-          setTimeout(() => {
-            performMinting();
-          }, 500);
-          return;
+          startedRef.current = true;
+          performMinting();
+        } else {
+          setMintingState((prev) => ({
+            ...prev,
+            isInitializing: false,
+            error:
+              "Origin SDK is taking longer than expected to initialize. This could be due to network issues or the SDK not being properly configured. Please refresh the page and try again. If the issue persists, check your network connection and ensure the CAMP_CLIENT_ID is properly set.",
+          }));
         }
+        initTimerRef.current = null;
+      }, 1000);
+    }
 
-        attempts++;
-        await new Promise((resolve) => setTimeout(resolve, 500));
+    return () => {
+      if (initTimerRef.current != null) {
+        clearTimeout(initTimerRef.current);
+        initTimerRef.current = null;
       }
-
-      // If we get here, Origin SDK didn't initialize in time
-      console.error(
-        "Origin SDK failed to initialize after",
-        maxAttempts * 500,
-        "ms",
-        "Final auth state:",
-        { hasAuth: !!auth, authKeys: auth ? Object.keys(auth) : [] },
-      );
-      setMintingState((prev) => ({
-        ...prev,
-        isInitializing: false,
-        error:
-          "Origin SDK is taking longer than expected to initialize. This could be due to network issues or the SDK not being properly configured. Please refresh the page and try again. If the issue persists, check your network connection and ensure the CAMP_CLIENT_ID is properly set.",
-      }));
     };
-
-    waitForOriginSDK();
-  }, [authenticated, auth]);
+  }, [authenticated, originReady]);
 
   const progress = ((mintingState.currentStep + 1) / mintingSteps.length) * 100;
 
@@ -593,23 +561,21 @@ export default function MintingProgress({
           {mintingSteps.map((step, index) => (
             <div
               key={step.id}
-              className={`flex items-start space-x-4 p-4 rounded-xl transition-all duration-500 ${
-                index < mintingState.currentStep
-                  ? "bg-green-500/10 border border-green-500/20"
-                  : index === mintingState.currentStep
-                    ? "bg-orange-500/10 border border-orange-500/20"
-                    : "bg-gray-800/30"
-              }`}
+              className={`flex items-start space-x-4 p-4 rounded-xl transition-all duration-500 ${index < mintingState.currentStep
+                ? "bg-green-500/10 border border-green-500/20"
+                : index === mintingState.currentStep
+                  ? "bg-orange-500/10 border border-orange-500/20"
+                  : "bg-gray-800/30"
+                }`}
             >
               {/* Step Icon */}
               <div
-                className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  index < mintingState.currentStep
-                    ? "bg-green-500"
-                    : index === mintingState.currentStep
-                      ? "bg-orange-500"
-                      : "bg-gray-600"
-                }`}
+                className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${index < mintingState.currentStep
+                  ? "bg-green-500"
+                  : index === mintingState.currentStep
+                    ? "bg-orange-500"
+                    : "bg-gray-600"
+                  }`}
               >
                 {index < mintingState.currentStep ? (
                   <Check className="h-5 w-5 text-white" />
@@ -623,11 +589,10 @@ export default function MintingProgress({
               {/* Step Content */}
               <div className="flex-1">
                 <h3
-                  className={`font-semibold mb-1 ${
-                    index <= mintingState.currentStep
-                      ? "text-white"
-                      : "text-gray-400"
-                  }`}
+                  className={`font-semibold mb-1 ${index <= mintingState.currentStep
+                    ? "text-white"
+                    : "text-gray-400"
+                    }`}
                 >
                   {step.title}
                 </h3>
