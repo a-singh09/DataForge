@@ -191,11 +191,27 @@ export function useLicensing() {
         };
       }
 
+      // If no user address was provided, attempt to read it from the wallet provider
       if (!userAddress) {
-        return {
-          success: false,
-          error: "User address required for renewal.",
-        };
+        try {
+          if (typeof window !== "undefined" && (window as any).ethereum) {
+            const accounts = await (window as any).ethereum.request({
+              method: "eth_accounts",
+            });
+            if (accounts && accounts.length > 0) {
+              userAddress = accounts[0] as `0x${string}`;
+            }
+          }
+        } catch (_) {
+          // ignore and fall through to error below
+        }
+
+        if (!userAddress) {
+          return {
+            success: false,
+            error: "User address required for renewal.",
+          };
+        }
       }
 
       setIsLoading(true);

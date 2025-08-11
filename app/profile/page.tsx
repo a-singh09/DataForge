@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from 'react';
-import { 
-  Wallet, 
-  Twitter, 
-  Music, 
-  MessageSquare, 
+import {
+  Wallet,
+  Twitter,
+  Music,
+  MessageSquare,
   Send,
   Settings,
   Bell,
@@ -13,7 +13,8 @@ import {
   ExternalLink,
   Copy,
   Check,
-  Edit
+  Edit,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +25,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import TransactionHistory from '@/components/profile/transaction-history';
+import Subscriptions from '@/components/profile/subscriptions';
+import Link from 'next/link';
+import { useLicensing } from '@/hooks/useLicensing';
+import { toast } from '@/hooks/use-toast';
 
 const socialPlatforms = [
   {
@@ -62,6 +67,10 @@ const socialPlatforms = [
 
 export default function ProfilePage() {
   const [copied, setCopied] = useState(false);
+  const { renewAccess } = useLicensing();
+  const [renewTokenId, setRenewTokenId] = useState<string>("");
+  const [renewPeriods, setRenewPeriods] = useState<number>(1);
+  const [isRenewing, setIsRenewing] = useState<boolean>(false);
   const [preferences, setPreferences] = useState({
     defaultLicenseDuration: '365',
     defaultRoyalty: 95,
@@ -77,6 +86,50 @@ export default function ProfilePage() {
     navigator.clipboard.writeText(walletAddress);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const getWalletAddress = async (): Promise<string | undefined> => {
+    try {
+      if (typeof window !== 'undefined' && (window as any).ethereum) {
+        const accounts = await (window as any).ethereum.request({ method: 'eth_accounts' });
+        if (accounts && accounts.length > 0) return accounts[0] as string;
+      }
+    } catch (_) {
+      // ignore
+    }
+    return undefined;
+  };
+
+  const handleRenew = async () => {
+    if (!renewTokenId) {
+      toast({ title: 'Token ID required', description: 'Enter a valid token ID to renew access.', variant: 'destructive' });
+      return;
+    }
+    if (renewPeriods < 1) {
+      toast({ title: 'Invalid periods', description: 'Periods must be at least 1.', variant: 'destructive' });
+      return;
+    }
+    setIsRenewing(true);
+    try {
+      const addr = await getWalletAddress();
+      if (!addr) {
+        toast({ title: 'No wallet detected', description: 'Connect your wallet first, then try again.', variant: 'destructive' });
+        setIsRenewing(false);
+        return;
+      }
+      const result = await renewAccess(BigInt(renewTokenId), renewPeriods, addr as `0x${string}`);
+      if (result.success) {
+        toast({ title: 'Renewal successful', description: `Tx: ${result.transactionHash?.slice(0, 10)}...` });
+        setRenewTokenId("");
+        setRenewPeriods(1);
+      } else {
+        toast({ title: 'Renewal failed', description: result.error || 'Please try again.', variant: 'destructive' });
+      }
+    } catch (err: any) {
+      toast({ title: 'Renewal failed', description: err?.message || 'Please try again.', variant: 'destructive' });
+    } finally {
+      setIsRenewing(false);
+    }
   };
 
   const handlePreferenceChange = (key: string, value: any) => {
@@ -97,7 +150,7 @@ export default function ProfilePage() {
                 Manage your account settings and preferences
               </p>
             </div>
-            
+
             <Button className="bg-orange-500 hover:bg-orange-600">
               <Edit className="h-4 w-4 mr-2" />
               Edit Profile
@@ -188,7 +241,7 @@ export default function ProfilePage() {
                             )}
                           </div>
                         </div>
-                        
+
                         <div className="flex items-center space-x-3">
                           {platform.connected && (
                             <Badge className="bg-green-500/20 text-green-400">
@@ -210,11 +263,72 @@ export default function ProfilePage() {
             </Card>
 
             {/* Transaction History */}
+            <Subscriptions />
             <TransactionHistory />
           </div>
 
           {/* Right Column */}
           <div className="space-y-8">
+            {/* Licenses & Renewals */}
+            <Card className="glass border-gray-800">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <RefreshCw className="h-5 w-5 mr-2 text-orange-400" />
+                  Licenses & Renewals
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-300">Renew your dataset access when a license is about to expire or has expired.</p>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div>
+                      <Label htmlFor="renew-token">Token ID</Label>
+                      <Input
+                        id="renew-token"
+                        placeholder="Enter IpNFT tokenId"
+                        value={renewTokenId}
+                        onChange={(e) => setRenewTokenId(e.target.value)}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="renew-periods">Periods</Label>
+                      <Input
+                        id="renew-periods"
+                        type="number"
+                        min={1}
+                        max={12}
+                        value={renewPeriods}
+                        onChange={(e) => setRenewPeriods(Math.max(1, Number(e.target.value)))}
+                        className="mt-1"
+                      />
+                    </div>
+                    <Button onClick={handleRenew} disabled={isRenewing} className="bg-orange-500 hover:bg-orange-600">
+                      {isRenewing ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Renew Access
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-300">Creator tip: after licenses expire, you can revise terms (price, duration, royalty) to encourage renewals.</p>
+                  <Link href="/dashboard">
+                    <Button variant="outline" className="w-full">Revise License Terms</Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
             {/* Preferences */}
             <Card className="glass border-gray-800">
               <CardHeader>
@@ -229,8 +343,8 @@ export default function ProfilePage() {
                   <Label className="text-base font-medium mb-3 block">
                     Default License Duration
                   </Label>
-                  <Select 
-                    value={preferences.defaultLicenseDuration} 
+                  <Select
+                    value={preferences.defaultLicenseDuration}
                     onValueChange={(value) => handlePreferenceChange('defaultLicenseDuration', value)}
                   >
                     <SelectTrigger>
