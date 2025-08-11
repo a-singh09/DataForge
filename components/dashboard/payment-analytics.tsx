@@ -297,7 +297,7 @@ export default function PaymentAnalytics({
         {/* Charts */}
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
-            {activeChart === "volume" && (
+            {activeChart === "volume" ? (
               <LineChart data={data.timeSeriesData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                 <XAxis dataKey="date" stroke="#9CA3AF" fontSize={12} />
@@ -325,9 +325,7 @@ export default function PaymentAnalytics({
                   dot={{ fill: "#10B981", strokeWidth: 2, r: 3 }}
                 />
               </LineChart>
-            )}
-
-            {activeChart === "gas" && (
+            ) : activeChart === "gas" ? (
               <BarChart data={data.timeSeriesData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                 <XAxis dataKey="date" stroke="#9CA3AF" fontSize={12} />
@@ -343,9 +341,7 @@ export default function PaymentAnalytics({
                 <Bar dataKey="gasCosts" fill="#EF4444" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="gasSaved" fill="#10B981" radius={[4, 4, 0, 0]} />
               </BarChart>
-            )}
-
-            {activeChart === "efficiency" && (
+            ) : activeChart === "efficiency" ? (
               <LineChart data={data.timeSeriesData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                 <XAxis dataKey="date" stroke="#9CA3AF" fontSize={12} />
@@ -364,6 +360,27 @@ export default function PaymentAnalytics({
                   stroke="#F59E0B"
                   strokeWidth={3}
                   dot={{ fill: "#F59E0B", strokeWidth: 2, r: 4 }}
+                />
+              </LineChart>
+            ) : (
+              <LineChart data={data.timeSeriesData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis dataKey="date" stroke="#9CA3AF" fontSize={12} />
+                <YAxis stroke="#9CA3AF" fontSize={12} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#1F2937",
+                    border: "1px solid #374151",
+                    borderRadius: "8px",
+                    color: "#F9FAFB",
+                  }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="volume"
+                  stroke="#3B82F6"
+                  strokeWidth={3}
+                  dot={{ fill: "#3B82F6", strokeWidth: 2, r: 4 }}
                 />
               </LineChart>
             )}

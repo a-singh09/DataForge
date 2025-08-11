@@ -1,19 +1,19 @@
 "use client";
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { 
-  ArrowLeft,
-  ArrowRight,
-  Hash,
-  X,
-  Plus
-} from 'lucide-react';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, ArrowRight, Hash, X, Plus } from "lucide-react";
 
 interface MetadataFormProps {
   data: any;
@@ -23,27 +23,32 @@ interface MetadataFormProps {
 }
 
 const categories = [
-  'Images & Photography',
-  'Text & Documents',
-  'Audio & Music',
-  'Video & Film',
-  'Code & Development',
-  'Social Media Content',
-  'Educational Content',
-  'Creative Writing',
-  'Data & Analytics',
-  'Other'
+  "Images & Photography",
+  "Text & Documents",
+  "Audio & Music",
+  "Video & Film",
+  "Code & Development",
+  "Social Media Content",
+  "Educational Content",
+  "Creative Writing",
+  "Data & Analytics",
+  "Other",
 ];
 
-export default function MetadataForm({ data, onDataChange, onNext, onBack }: MetadataFormProps) {
+export default function MetadataForm({
+  data,
+  onDataChange,
+  onNext,
+  onBack,
+}: MetadataFormProps) {
   const [metadata, setMetadata] = useState({
-    title: '',
-    description: '',
-    category: '',
+    title: "",
+    description: "",
+    category: "",
     tags: [] as string[],
-    ...data.metadata
+    ...data.metadata,
   });
-  const [newTag, setNewTag] = useState('');
+  const [newTag, setNewTag] = useState("");
 
   const handleInputChange = (field: string, value: string) => {
     const updated = { ...metadata, [field]: value };
@@ -56,27 +61,31 @@ export default function MetadataForm({ data, onDataChange, onNext, onBack }: Met
       const updated = { ...metadata, tags: [...metadata.tags, newTag.trim()] };
       setMetadata(updated);
       onDataChange({ metadata: updated });
-      setNewTag('');
+      setNewTag("");
     }
   };
 
   const removeTag = (tagToRemove: string) => {
-    const updated = { ...metadata, tags: metadata.tags.filter(tag => tag !== tagToRemove) };
+    const updated = {
+      ...metadata,
+      tags: metadata.tags.filter((tag: string) => tag !== tagToRemove),
+    };
     setMetadata(updated);
     onDataChange({ metadata: updated });
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       e.preventDefault();
       addTag();
     }
   };
 
-  const isValid = metadata.title.trim() && 
-                  metadata.description.trim() && 
-                  metadata.category && 
-                  metadata.tags.length > 0;
+  const isValid =
+    metadata.title.trim() &&
+    metadata.description.trim() &&
+    metadata.category &&
+    metadata.tags.length > 0;
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -97,7 +106,7 @@ export default function MetadataForm({ data, onDataChange, onNext, onBack }: Met
             <Input
               id="title"
               value={metadata.title}
-              onChange={(e) => handleInputChange('title', e.target.value)}
+              onChange={(e) => handleInputChange("title", e.target.value)}
               placeholder="Enter a descriptive title for your content"
               className="h-12 text-lg"
             />
@@ -108,18 +117,22 @@ export default function MetadataForm({ data, onDataChange, onNext, onBack }: Met
 
           {/* Description */}
           <div>
-            <Label htmlFor="description" className="text-base font-medium mb-3 block">
+            <Label
+              htmlFor="description"
+              className="text-base font-medium mb-3 block"
+            >
               Description *
             </Label>
             <Textarea
               id="description"
               value={metadata.description}
-              onChange={(e) => handleInputChange('description', e.target.value)}
+              onChange={(e) => handleInputChange("description", e.target.value)}
               placeholder="Describe your content, its quality, and potential use cases for AI training"
               className="min-h-32 text-base"
             />
             <p className="text-sm text-gray-400 mt-2">
-              Include details about format, quality, themes, and AI training applications
+              Include details about format, quality, themes, and AI training
+              applications
             </p>
           </div>
 
@@ -128,7 +141,10 @@ export default function MetadataForm({ data, onDataChange, onNext, onBack }: Met
             <Label className="text-base font-medium mb-3 block">
               Category *
             </Label>
-            <Select value={metadata.category} onValueChange={(value) => handleInputChange('category', value)}>
+            <Select
+              value={metadata.category}
+              onValueChange={(value) => handleInputChange("category", value)}
+            >
               <SelectTrigger className="h-12 text-base">
                 <SelectValue placeholder="Select a category" />
               </SelectTrigger>
@@ -169,10 +185,10 @@ export default function MetadataForm({ data, onDataChange, onNext, onBack }: Met
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
-              
+
               {metadata.tags.length > 0 && (
                 <div className="flex flex-wrap gap-2">
-                  {metadata.tags.map((tag) => (
+                  {metadata.tags.map((tag: string) => (
                     <Badge
                       key={tag}
                       variant="secondary"
@@ -193,7 +209,8 @@ export default function MetadataForm({ data, onDataChange, onNext, onBack }: Met
               )}
             </div>
             <p className="text-sm text-gray-400 mt-2">
-              Add relevant tags to help AI companies find your content (e.g., nature, urban, portraits)
+              Add relevant tags to help AI companies find your content (e.g.,
+              nature, urban, portraits)
             </p>
           </div>
         </div>
@@ -205,7 +222,7 @@ export default function MetadataForm({ data, onDataChange, onNext, onBack }: Met
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
-        
+
         <Button
           onClick={onNext}
           disabled={!isValid}

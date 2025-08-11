@@ -159,7 +159,7 @@ export default function FilterSidebar() {
         <div className="px-2">
           <Slider
             value={priceRange}
-            onValueChange={setPriceRange}
+            onValueChange={(value) => setPriceRange(value as [number, number])}
             max={5}
             min={0}
             step={0.1}

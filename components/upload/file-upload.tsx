@@ -189,7 +189,7 @@ export default function FileUpload({
                   console.log(
                     `Found matching file by ID, updating progress to ${progress}%`,
                   );
-                  return { ...f, uploadProgress: progress };
+                  return { ...f, uploadProgress: progress } as FileWithPreview;
                 }
                 return f;
               });

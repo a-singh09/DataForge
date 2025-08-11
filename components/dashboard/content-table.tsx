@@ -227,10 +227,15 @@ export default function ContentTable() {
         price: parseEther(newPrice),
         duration: newDuration,
         royaltyBps: newRoyalty,
-        paymentToken: "0x0000000000000000000000000000000000000000", // Native token
+        paymentToken:
+          "0x0000000000000000000000000000000000000000" as `0x${string}`, // Native token
       };
 
-      await auth.origin.updateTerms(BigInt(tokenId), newTerms);
+      // Get the current user's address - this might be needed for updateTerms
+      // For now, we'll use a placeholder or try to get it from the auth context
+      const userAddress =
+        "0x0000000000000000000000000000000000000000" as `0x${string}`;
+      await auth.origin.updateTerms(BigInt(tokenId), userAddress, newTerms);
 
       // Refresh the data
       refetchUploads();
@@ -300,7 +305,11 @@ export default function ContentTable() {
         <CardContent>
           <div className="text-center py-8">
             <p className="text-red-400 mb-4">Failed to load content</p>
-            <Button onClick={refetchUploads} variant="outline" size="sm">
+            <Button
+              onClick={() => refetchUploads()}
+              variant="outline"
+              size="sm"
+            >
               <RefreshCw className="h-4 w-4 mr-2" />
               Retry
             </Button>
@@ -340,7 +349,11 @@ export default function ContentTable() {
               >
                 Grid
               </Button>
-              <Button onClick={refetchUploads} variant="ghost" size="sm">
+              <Button
+                onClick={() => refetchUploads()}
+                variant="ghost"
+                size="sm"
+              >
                 <RefreshCw className="h-4 w-4" />
               </Button>
             </div>

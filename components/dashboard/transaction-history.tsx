@@ -630,7 +630,7 @@ export default function TransactionHistory() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {tx.gasFee && (
+                      {tx.gasFee && tx.gasFee > BigInt(0) ? (
                         <div>
                           <p className="text-sm">
                             {Number(formatEther(tx.gasFee)).toFixed(6)} ETH
@@ -639,7 +639,7 @@ export default function TransactionHistory() {
                             {tx.gasUsed?.toString()} gas
                           </p>
                         </div>
-                      )}
+                      ) : null}
                     </TableCell>
                     <TableCell>
                       {tx.txHash && (

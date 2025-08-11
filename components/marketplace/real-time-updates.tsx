@@ -35,7 +35,7 @@ export default function RealTimeUpdates({ onRefresh }: RealTimeUpdatesProps) {
           data: {
             title: "New AI Training Dataset",
             contentType: "image",
-            creator: { address: "0x..." },
+            creator: { address: "0x...", socialProfiles: {} },
           },
           timestamp: Date.now(),
         };

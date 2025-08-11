@@ -258,6 +258,44 @@ export function useLicensing() {
     [auth?.origin],
   );
 
+  /**
+   * Get content URL for a dataset (requires valid license)
+   */
+  const getContentUrl = useCallback(
+    async (tokenId: bigint): Promise<string | null> => {
+      if (!auth?.origin) {
+        throw new Error("Origin SDK not available");
+      }
+
+      try {
+        // Get the content hash from the blockchain
+        const contentHash = await auth.origin.contentHash(tokenId);
+
+        if (!contentHash) {
+          return null;
+        }
+
+        // Convert IPFS hash to HTTP URL
+        if (contentHash.startsWith("ipfs://")) {
+          return contentHash.replace("ipfs://", "https://ipfs.io/ipfs/");
+        } else if (
+          contentHash.startsWith("Qm") ||
+          contentHash.startsWith("bafy")
+        ) {
+          return `https://ipfs.io/ipfs/${contentHash}`;
+        } else if (contentHash.startsWith("http")) {
+          return contentHash;
+        }
+
+        return contentHash;
+      } catch (error) {
+        console.error("Failed to get content URL:", error);
+        return null;
+      }
+    },
+    [auth?.origin],
+  );
+
   return {
     // State
     isLoading,
@@ -268,5 +306,6 @@ export function useLicensing() {
     checkAccess,
     renewAccess,
     getLicenseTerms,
+    getContentUrl,
   };
 }

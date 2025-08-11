@@ -1,20 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  Download,
-  Key,
-  AlertTriangle,
-  CheckCircle,
-  RefreshCw,
-} from "lucide-react";
+import { Download, AlertTriangle, CheckCircle, RefreshCw } from "lucide-react";
 
 // Type declaration for window.ethereum
 declare global {
   interface Window {
-    ethereum?: {
-      request: (args: { method: string; params?: any[] }) => Promise<any>;
-    };
+    ethereum?: any;
   }
 }
 import { Button } from "@/components/ui/button";
@@ -41,8 +33,6 @@ export default function DatasetAccess({
   const [licenseStatus, setLicenseStatus] = useState<LicenseStatus | null>(
     null,
   );
-  const [isGeneratingToken, setIsGeneratingToken] = useState(false);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
   // Check access status on component mount and when dataset changes
@@ -159,62 +149,13 @@ export default function DatasetAccess({
   };
 
   /**
-   * Generate access token for authenticated downloads
-   */
-  const generateAccessToken = async () => {
-    if (!origin || !licenseStatus?.hasAccess) {
-      toast({
-        title: "Access Denied",
-        description: "You need a valid license to generate an access token.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsGeneratingToken(true);
-
-    try {
-      // In a real implementation, this would call a backend API to generate a JWT token
-      // For now, we'll simulate token generation using the user's wallet signature
-      const message = `Generate access token for dataset ${dataset.tokenId} at ${Date.now()}`;
-
-      // This would typically be handled by a backend service that verifies the license
-      // and generates a secure JWT token with appropriate claims
-      const mockToken = btoa(
-        JSON.stringify({
-          tokenId: dataset.tokenId.toString(),
-          userAddress: "authenticated_user",
-          timestamp: Date.now(),
-          expiresAt: licenseStatus.expiryDate?.getTime(),
-        }),
-      );
-
-      setAccessToken(mockToken);
-
-      toast({
-        title: "Access Token Generated",
-        description: "You can now download the dataset using this token.",
-      });
-    } catch (error: any) {
-      console.error("Failed to generate access token:", error);
-      toast({
-        title: "Token Generation Failed",
-        description: error.message || "Failed to generate access token.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGeneratingToken(false);
-    }
-  };
-
-  /**
-   * Download dataset using access token
+   * Download dataset directly (no access token needed)
    */
   const downloadDataset = async () => {
-    if (!accessToken || !licenseStatus?.hasAccess) {
+    if (!licenseStatus?.hasAccess) {
       toast({
         title: "Download Failed",
-        description: "Valid access token required for download.",
+        description: "You need a valid license to download this dataset.",
         variant: "destructive",
       });
       return;
@@ -223,35 +164,205 @@ export default function DatasetAccess({
     setIsDownloading(true);
 
     try {
-      // In a real implementation, this would make an authenticated request to download the dataset
-      // The backend would verify the access token and serve the content
+      // Get the actual content URL with multiple IPFS gateway fallbacks
+      let contentUrl = "";
+      let fileName = "";
+      let mimeType = "application/octet-stream";
 
-      // Simulate download process
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // List of IPFS gateways to try (in order of preference)
+      const ipfsGateways = [
+        "https://gateway.pinata.cloud/ipfs/",
+        "https://cloudflare-ipfs.com/ipfs/",
+        "https://ipfs.io/ipfs/",
+        "https://dweb.link/ipfs/",
+        "https://gateway.ipfs.io/ipfs/",
+      ];
 
-      // For demo purposes, we'll create a mock download
-      const blob = new Blob(
-        [
-          `Dataset: ${dataset.title}\nContent Hash: ${dataset.contentHash}\nAccess Token: ${accessToken}`,
-        ],
-        {
-          type: "text/plain",
-        },
-      );
+      let contentHash = "";
 
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${dataset.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_dataset.txt`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Get content hash from various sources
+      if (dataset.contentHash) {
+        contentHash = dataset.contentHash.startsWith("ipfs://")
+          ? dataset.contentHash.replace("ipfs://", "")
+          : dataset.contentHash;
+      } else if (dataset.uri) {
+        contentHash = dataset.uri.startsWith("ipfs://")
+          ? dataset.uri.replace("ipfs://", "")
+          : dataset.uri.startsWith("http")
+            ? dataset.uri
+            : dataset.uri;
+      }
 
-      toast({
-        title: "Download Started",
-        description: `Downloading ${dataset.title}...`,
-      });
+      // If we have a content hash, construct URLs with different gateways
+      if (
+        contentHash &&
+        (contentHash.startsWith("Qm") || contentHash.startsWith("bafy"))
+      ) {
+        contentUrl = ipfsGateways[0] + contentHash; // Start with the first gateway
+      } else if (contentHash.startsWith("http")) {
+        contentUrl = contentHash; // Already a full URL
+      }
+
+      // Determine file extension and MIME type based on content type
+      switch (dataset.contentType) {
+        case "image":
+          fileName = `${dataset.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_dataset.jpg`;
+          mimeType = "image/jpeg";
+          break;
+        case "audio":
+          fileName = `${dataset.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_dataset.mp3`;
+          mimeType = "audio/mpeg";
+          break;
+        case "video":
+          fileName = `${dataset.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_dataset.mp4`;
+          mimeType = "video/mp4";
+          break;
+        case "code":
+          fileName = `${dataset.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_dataset.json`;
+          mimeType = "application/json";
+          break;
+        case "social":
+        case "text":
+        default:
+          fileName = `${dataset.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_dataset.txt`;
+          mimeType = "text/plain";
+          break;
+      }
+
+      if (contentUrl) {
+        toast({
+          title: "Download Started",
+          description: `Fetching ${dataset.title} from IPFS...`,
+        });
+
+        let success = false;
+        let lastError = null;
+
+        // Try multiple IPFS gateways if the first one fails
+        for (let i = 0; i < ipfsGateways.length && !success; i++) {
+          try {
+            const gatewayUrl = contentHash.startsWith("http")
+              ? contentUrl
+              : ipfsGateways[i] + contentHash;
+
+            console.log(
+              `Trying gateway ${i + 1}/${ipfsGateways.length}: ${gatewayUrl}`,
+            );
+
+            const response = await fetch(gatewayUrl, {
+              method: "GET",
+              headers: {
+                Accept: "*/*",
+              },
+            });
+
+            if (!response.ok) {
+              throw new Error(
+                `HTTP ${response.status}: ${response.statusText}`,
+              );
+            }
+
+            // Get the content as blob
+            const contentBlob = await response.blob();
+
+            // Use the actual content type from the response if available
+            let actualMimeType =
+              response.headers.get("content-type") || mimeType;
+
+            // If we got a generic content type, try to infer from the blob type
+            if (
+              actualMimeType === "application/octet-stream" ||
+              actualMimeType === "text/plain"
+            ) {
+              actualMimeType = contentBlob.type || mimeType;
+            }
+
+            // Update filename extension based on actual content type
+            if (actualMimeType.startsWith("image/")) {
+              const ext = actualMimeType.split("/")[1] || "jpg";
+              fileName = fileName.replace(/\.[^.]+$/, `.${ext}`);
+            } else if (actualMimeType.startsWith("audio/")) {
+              const ext = actualMimeType.split("/")[1] || "mp3";
+              fileName = fileName.replace(/\.[^.]+$/, `.${ext}`);
+            } else if (actualMimeType.startsWith("video/")) {
+              const ext = actualMimeType.split("/")[1] || "mp4";
+              fileName = fileName.replace(/\.[^.]+$/, `.${ext}`);
+            } else if (actualMimeType === "application/json") {
+              fileName = fileName.replace(/\.[^.]+$/, ".json");
+            }
+
+            // Create a new blob with the correct MIME type
+            const blob = new Blob([contentBlob], { type: actualMimeType });
+
+            // Trigger download
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            toast({
+              title: "Download Complete",
+              description: `Successfully downloaded ${dataset.title}`,
+            });
+
+            success = true;
+          } catch (error: any) {
+            console.warn(`Gateway ${i + 1} failed:`, error.message);
+            lastError = error;
+
+            // If this isn't the last gateway, continue to the next one
+            if (i < ipfsGateways.length - 1) {
+              continue;
+            }
+          }
+        }
+
+        // If all gateways failed, throw the last error
+        if (!success && lastError) {
+          throw lastError;
+        }
+      } else {
+        // Fallback: create a metadata file if no content URL is available
+        const metadataContent = JSON.stringify(
+          {
+            title: dataset.title,
+            description: dataset.description,
+            contentType: dataset.contentType,
+            contentHash: dataset.contentHash,
+            creator: dataset.creator,
+            license: {
+              ...dataset.license,
+              price: dataset.license.price.toString(), // Convert BigInt to string for JSON
+            },
+            tags: dataset.tags,
+            samples: dataset.samples,
+            downloadedAt: new Date().toISOString(),
+          },
+          null,
+          2,
+        );
+
+        const blob = new Blob([metadataContent], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${dataset.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_metadata.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        toast({
+          title: "Metadata Downloaded",
+          description:
+            "Content not directly accessible. Downloaded metadata instead.",
+          variant: "default",
+        });
+      }
     } catch (error: any) {
       console.error("Download failed:", error);
       toast({
@@ -293,7 +404,7 @@ export default function DatasetAccess({
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Key className="h-5 w-5 text-orange-400" />
+            <Download className="h-5 w-5 text-orange-400" />
             Dataset Access
           </div>
           <Button
@@ -358,46 +469,24 @@ export default function DatasetAccess({
         {/* Access Actions */}
         {licenseStatus.hasAccess ? (
           <div className="space-y-3">
-            {/* Generate Access Token */}
+            {/* Direct Download */}
             <Button
-              onClick={generateAccessToken}
-              disabled={isGeneratingToken}
-              className="w-full"
-              variant="outline"
+              onClick={downloadDataset}
+              disabled={isDownloading}
+              className="w-full bg-orange-500 hover:bg-orange-600"
             >
-              {isGeneratingToken ? (
+              {isDownloading ? (
                 <>
                   <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Generating Token...
+                  Downloading...
                 </>
               ) : (
                 <>
-                  <Key className="h-4 w-4 mr-2" />
-                  Generate Access Token
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Dataset
                 </>
               )}
             </Button>
-
-            {/* Download Dataset */}
-            {accessToken && (
-              <Button
-                onClick={downloadDataset}
-                disabled={isDownloading}
-                className="w-full bg-orange-500 hover:bg-orange-600"
-              >
-                {isDownloading ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    Downloading...
-                  </>
-                ) : (
-                  <>
-                    <Download className="h-4 w-4 mr-2" />
-                    Download Dataset
-                  </>
-                )}
-              </Button>
-            )}
 
             {/* Renewal Warning */}
             {licenseStatus.daysRemaining !== undefined &&
@@ -429,29 +518,6 @@ export default function DatasetAccess({
               {licenseStatus.isExpired && " Your previous license has expired."}
             </AlertDescription>
           </Alert>
-        )}
-
-        {/* Access Token Display */}
-        {accessToken && (
-          <div className="mt-4 p-3 bg-gray-800/50 rounded-lg">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-gray-400">Access Token</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  navigator.clipboard.writeText(accessToken);
-                  toast({ title: "Token copied to clipboard" });
-                }}
-                className="h-6 text-xs"
-              >
-                Copy
-              </Button>
-            </div>
-            <code className="text-xs text-gray-300 break-all">
-              {accessToken.slice(0, 50)}...
-            </code>
-          </div>
         )}
       </CardContent>
     </Card>

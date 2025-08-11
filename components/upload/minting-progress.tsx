@@ -314,12 +314,14 @@ export default function MintingProgress({
 
         console.log("Converted price to wei:", priceInWei.toString());
 
-        if (priceInWei <= 0n) {
+        if (priceInWei <= BigInt(0)) {
           throw new Error("License price must be greater than 0");
         }
       } catch (error) {
         console.error("Price conversion error:", error);
-        throw new Error(`Invalid price: ${error.message}`);
+        throw new Error(
+          `Invalid price: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
 
       // Validate duration
@@ -382,7 +384,7 @@ export default function MintingProgress({
         constructor: fileForMint.constructor.name,
       });
 
-      let mintedTokenId: string;
+      let mintedTokenId: string | null = null;
 
       try {
         console.log("Calling Origin SDK mintFile with:", {
