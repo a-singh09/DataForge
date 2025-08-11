@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Search, Filter, Grid, List, TrendingUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +13,7 @@ import {
 } from "@/components/ui/select";
 import DatasetCard from "@/components/marketplace/dataset-card";
 import FilterSidebar from "@/components/marketplace/filter-sidebar";
-import { MarketplaceProvider } from "@/components/marketplace/marketplace-provider";
-import { useMarketplaceData } from "@/hooks/useMarketplaceData";
+import { MarketplaceProvider, useMarketplaceContext } from "@/components/marketplace/marketplace-provider";
 import { useAuthState } from "@campnetwork/origin/react";
 import { toast } from "@/hooks/use-toast";
 
@@ -26,25 +25,21 @@ function MarketplaceContent() {
   const [sortBy, setSortBy] = useState<MarketplaceFilters["sortBy"]>("popular");
   const [showFilters, setShowFilters] = useState(false);
   const { authenticated } = useAuthState();
+  const ctx = useMarketplaceContext();
+  const datasets = ctx.data;
+  const totalCount = ctx.totalCount;
+  const isLoading = ctx.isLoading;
+  const isError = ctx.isError;
+  const error = ctx.error;
+  const refetch = ctx.refetch;
 
-  // Build filters from current state
-  const filters = useMemo<Partial<MarketplaceFilters>>(
-    () => ({
+  // Sync local search/sort with marketplace context filters
+  useEffect(() => {
+    ctx.updateFilters({
       searchQuery: searchQuery.trim() || undefined,
       sortBy,
-    }),
-    [searchQuery, sortBy],
-  );
-
-  // Fetch marketplace data using the real hooks
-  const {
-    data: datasets,
-    totalCount,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useMarketplaceData(filters, 20);
+    });
+  }, [searchQuery, sortBy]);
 
   // Fetch trending datasets for the hero section (currently unused but ready for future features)
   // const { data: trendingDatasets, isLoading: isTrendingLoading } = useTrendingIpNFTs(6);

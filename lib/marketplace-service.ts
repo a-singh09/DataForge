@@ -7,6 +7,13 @@ import {
 
 export class MarketplaceService {
   private auth: Auth;
+  private static inFlight: Map<string, Promise<MarketplaceResponse>> =
+    new Map();
+  private static cache: Map<
+    string,
+    { timestamp: number; data: MarketplaceResponse }
+  > = new Map();
+  private static cacheTtlMs = 30 * 1000; // 30 seconds
 
   constructor(auth: Auth) {
     this.auth = auth;
@@ -114,136 +121,139 @@ export class MarketplaceService {
   async getMarketplaceData(
     params: MarketplaceQueryParams,
   ): Promise<MarketplaceResponse> {
-    try {
-      console.log("Fetching real marketplace data from Origin SDK...");
+    const cacheKey = JSON.stringify({ k: "marketplace", params });
+    const cached = MarketplaceService.cache.get(cacheKey);
+    if (
+      cached &&
+      Date.now() - cached.timestamp < MarketplaceService.cacheTtlMs
+    ) {
+      return cached.data;
+    }
 
-      // if (!this.auth.origin) {
-      //   console.warn("Origin SDK not available");
-      //   return await this.getMockMarketplaceData(params);
-      // }
+    const existing = MarketplaceService.inFlight.get(cacheKey);
+    if (existing) {
+      return existing;
+    }
 
-      // Step 1: Get current user's uploads (real data)
-      const userUploads = await this.auth.origin.getOriginUploads();
-      console.log("User uploads found:", userUploads?.length || 0);
+    const fetchPromise = (async () => {
+      try {
+        console.log("Fetching real marketplace data from Origin SDK...");
 
-      const allIpNFTs: IpNFTMetadata[] = [];
+        // if (!this.auth.origin) {
+        //   console.warn("Origin SDK not available");
+        //   return await this.getMockMarketplaceData(params);
+        // }
 
-      // Step 2: Process user uploads
-      if (userUploads && userUploads.length > 0) {
-        for (const upload of userUploads) {
-          try {
-            const tokenId = BigInt(upload.tokenId || upload.id || 1);
-            const metadata = await this.getIpNFTMetadata(tokenId);
-            if (metadata) {
-              allIpNFTs.push(metadata);
+        // Step 1: Get current user's uploads (real data)
+        const userUploads = await this.auth.origin.getOriginUploads();
+        console.log("User uploads found:", userUploads?.length || 0);
+
+        const allIpNFTs: IpNFTMetadata[] = [];
+
+        // Step 2: Process user uploads
+        if (userUploads && userUploads.length > 0) {
+          for (const upload of userUploads) {
+            try {
+              const tokenId = BigInt(upload.tokenId || upload.id || 1);
+              const metadata = await this.getIpNFTMetadata(tokenId);
+              if (metadata) {
+                allIpNFTs.push(metadata);
+              }
+            } catch (error) {
+              console.warn("Failed to fetch upload metadata:", error);
             }
-          } catch (error) {
-            console.warn("Failed to fetch upload metadata:", error);
           }
         }
-      }
 
-      // Step 3: Fetch specific known token IDs and discover others
-      console.log("Fetching known token IDs and discovering others...");
+        // Step 3: Fetch specific known token IDs and discover others
+        console.log("Fetching known token IDs and discovering others...");
 
-      // Known token IDs to fetch (including the specific one you provided)
-      const knownTokenIds = [
-        BigInt(
-          "7235602763579303523229090887911893772021989063542858376305575221240366367542",
-        ), // Your specific token
-        // BigInt("1"),
-        // BigInt("2"),
-        // BigInt("3"),
-        // BigInt("4"),
-        // BigInt("5"),
-      ];
+        // Known token IDs to fetch (including the specific one you provided)
+        const knownTokenIds = [
+          BigInt(
+            "7235602763579303523229090887911893772021989063542858376305575221240366367542",
+          ),
+        ];
 
-      // Fetch known tokens in batches
-      const batchSize = 1; // Fetch 1 tokens at a time for better reliability
-      const batches = [];
+        // Fetch known tokens in batches
+        const batchSize = 1; // Fetch 1 tokens at a time for better reliability
+        const batches = [] as bigint[][];
 
-      for (let i = 0; i < knownTokenIds.length; i += batchSize) {
-        batches.push(knownTokenIds.slice(i, i + batchSize));
-      }
+        for (let i = 0; i < knownTokenIds.length; i += batchSize) {
+          batches.push(knownTokenIds.slice(i, i + batchSize));
+        }
 
-      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-        const batch = batches[batchIndex];
-        const batchPromises = batch.map((tokenId) =>
-          this.getIpNFTMetadata(tokenId).catch(() => null),
+        for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+          const batch = batches[batchIndex];
+          const batchPromises = batch.map((tokenId) =>
+            this.getIpNFTMetadata(tokenId).catch(() => null),
+          );
+
+          try {
+            console.log(
+              `Fetching batch ${batchIndex + 1}/${batches.length} with token IDs:`,
+              batch.map((id) => id.toString()),
+            );
+
+            const batchResults = await Promise.all(batchPromises);
+            const validTokensInBatch = batchResults.filter(
+              Boolean,
+            ) as IpNFTMetadata[];
+
+            console.log(
+              `Batch ${batchIndex + 1}: Found ${validTokensInBatch.length} valid IpNFTs`,
+            );
+
+            if (validTokensInBatch.length > 0) {
+              validTokensInBatch.forEach((token) => {
+                console.log(
+                  `✅ Found IpNFT: ${token.title} (Token ID: ${token.tokenId})`,
+                );
+              });
+            }
+
+            allIpNFTs.push(...validTokensInBatch);
+
+            // Small delay between batches to be respectful to the RPC
+            if (batchIndex < batches.length - 1) {
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
+          } catch (batchError) {
+            console.warn(`Batch ${batchIndex + 1} failed:`, batchError);
+            // Continue with next batch even if this one fails
+          }
+        }
+
+        console.log(
+          `Discovery complete: Found ${allIpNFTs.length - (userUploads?.length || 0)} additional IpNFTs`,
         );
 
-        try {
-          console.log(
-            `Fetching batch ${batchIndex + 1}/${batches.length} with token IDs:`,
-            batch.map((id) => id.toString()),
-          );
+        // Remove duplicates based on tokenId
+        const uniqueTokens = allIpNFTs.filter(
+          (token, index, self) =>
+            index === self.findIndex((t) => t.tokenId === token.tokenId),
+        );
 
-          const batchResults = await Promise.all(batchPromises);
-          const validTokensInBatch = batchResults.filter(
-            Boolean,
-          ) as IpNFTMetadata[];
+        console.log(`Total unique IpNFTs found: ${uniqueTokens.length}`);
 
-          console.log(
-            `Batch ${batchIndex + 1}: Found ${validTokensInBatch.length} valid IpNFTs`,
-          );
-
-          if (validTokensInBatch.length > 0) {
-            validTokensInBatch.forEach((token) => {
-              console.log(
-                `✅ Found IpNFT: ${token.title} (Token ID: ${token.tokenId})`,
-              );
-            });
-          }
-
-          allIpNFTs.push(...validTokensInBatch);
-
-          // Small delay between batches to be respectful to the RPC
-          if (batchIndex < batches.length - 1) {
-            await new Promise((resolve) => setTimeout(resolve, 1000)); // 1 second delay for safety
-          }
-        } catch (batchError) {
-          console.warn(`Batch ${batchIndex + 1} failed:`, batchError);
-          // Continue with next batch even if this one fails
-        }
+        // Apply filters and sorting
+        const response = this.applyFiltersAndPagination(uniqueTokens, params);
+        MarketplaceService.cache.set(cacheKey, {
+          timestamp: Date.now(),
+          data: response,
+        });
+        return response;
+      } catch (error) {
+        console.error("Failed to fetch marketplace data:", error);
+        console.warn("Falling back to mock data");
+        throw error;
+      } finally {
+        MarketplaceService.inFlight.delete(cacheKey);
       }
+    })();
 
-      console.log(
-        `Discovery complete: Found ${allIpNFTs.length - (userUploads?.length || 0)} additional IpNFTs`,
-      );
-
-      // Remove duplicates based on tokenId
-      const uniqueTokens = allIpNFTs.filter(
-        (token, index, self) =>
-          index === self.findIndex((t) => t.tokenId === token.tokenId),
-      );
-
-      console.log(`Total unique IpNFTs found: ${uniqueTokens.length}`);
-
-      // If we don't have enough real data, supplement with mock data
-      // if (uniqueTokens.length < 10) {
-      //   console.log("Supplementing with mock data for better UX...");
-      //   const mockData = await this.getMockMarketplaceData({
-      //     page: 1,
-      //     limit: 10,
-      //     filters: {},
-      //   });
-
-      //   // Add mock data with different token IDs to avoid conflicts
-      //   const mockWithDifferentIds = mockData.items.map((item, index) => ({
-      //     ...item,
-      //     tokenId: BigInt(1000 + index), // Use high token IDs for mock data
-      //   }));
-
-      //   uniqueTokens.push(...mockWithDifferentIds);
-      // }
-
-      // Apply filters and sorting
-      return this.applyFiltersAndPagination(uniqueTokens, params);
-    } catch (error) {
-      console.error("Failed to fetch marketplace data:", error);
-      console.warn("Falling back to mock data");
-      // return await this.getMockMarketplaceData(params);
-    }
+    MarketplaceService.inFlight.set(cacheKey, fetchPromise);
+    return fetchPromise;
   }
 
   /**

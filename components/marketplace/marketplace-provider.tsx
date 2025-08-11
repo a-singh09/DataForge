@@ -67,11 +67,15 @@ export function MarketplaceProvider({
     initialPaginationMode,
   );
 
-  // Regular pagination data
-  const paginatedQuery = useMarketplaceData(filters, itemsPerPage);
+  // Regular pagination data (enabled only when paginationMode === 'pages')
+  const paginatedQuery = useMarketplaceData(filters, itemsPerPage, {
+    enabled: paginationMode === "pages",
+  });
 
-  // Infinite scroll data
-  const infiniteQuery = useInfiniteMarketplaceData(filters, itemsPerPage);
+  // Infinite scroll data (enabled only when paginationMode === 'infinite')
+  const infiniteQuery = useInfiniteMarketplaceData(filters, itemsPerPage, {
+    enabled: paginationMode === "infinite",
+  });
 
   const updateFilters = useCallback(
     (newFilters: Partial<MarketplaceFilters>) => {

@@ -20,6 +20,7 @@ import { useEffect, useMemo } from "react";
 export function useMarketplaceData(
   filters: Partial<MarketplaceFilters> = {},
   limit: number = 20,
+  options?: { enabled?: boolean },
 ) {
   const { auth } = useAuth();
   const queryClient = useQueryClient();
@@ -41,9 +42,15 @@ export function useMarketplaceData(
         filters,
       });
     },
-    enabled: !!marketplaceService,
+    enabled: !!marketplaceService && (options?.enabled ?? true),
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
+    // Avoid repeated background refetches to fetch only once per mount unless manually refetched
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    retry: 1,
+    keepPreviousData: true,
   });
 
   // Set up real-time updates
@@ -76,6 +83,7 @@ export function useMarketplaceData(
 export function useInfiniteMarketplaceData(
   filters: Partial<MarketplaceFilters> = {},
   limit: number = 20,
+  options?: { enabled?: boolean },
 ) {
   const { auth } = useAuth();
 
@@ -94,13 +102,17 @@ export function useInfiniteMarketplaceData(
         filters,
       });
     },
-    enabled: !!marketplaceService,
+    enabled: !!marketplaceService && (options?.enabled ?? true),
     initialPageParam: 1,
     getNextPageParam: (lastPage, allPages) => {
       return lastPage.hasNextPage ? allPages.length + 1 : undefined;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    retry: 1,
   });
 
   const allItems = useMemo(() => {
