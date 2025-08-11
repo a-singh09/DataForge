@@ -19,13 +19,24 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   const clientId = process.env.NEXT_PUBLIC_CAMP_CLIENT_ID;
 
+  console.log(
+    "Providers initializing with clientId:",
+    clientId ? "✓ Present" : "✗ Missing",
+  );
+
   if (!clientId) {
-    console.error("NEXT_PUBLIC_CAMP_CLIENT_ID is not set in environment variables");
+    console.error(
+      "NEXT_PUBLIC_CAMP_CLIENT_ID is not set in environment variables",
+    );
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Configuration Error</h1>
-          <p className="text-gray-600">Camp Network client ID is not configured.</p>
+          <h1 className="text-2xl font-bold text-red-600 mb-4">
+            Configuration Error
+          </h1>
+          <p className="text-gray-600">
+            Camp Network client ID is not configured.
+          </p>
         </div>
       </div>
     );

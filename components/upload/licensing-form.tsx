@@ -63,7 +63,7 @@ export default function LicensingForm({
   const auth = useAuth();
 
   const [licensing, setLicensing] = useState({
-    fixedPrice: 0.1,
+    fixedPrice: 0.01, 
     duration: 365 * 24 * 60 * 60, // 1 year in seconds
     royaltyPercentage: 95, // 95% to creator, 5% platform fee
     paymentToken: "0x0000000000000000000000000000000000000000", // Native ETH
@@ -158,7 +158,10 @@ export default function LicensingForm({
                   min="0.01"
                   value={licensing.fixedPrice}
                   onChange={(e) =>
-                    handleChange("fixedPrice", parseFloat(e.target.value) || 0)
+                    handleChange(
+                      "fixedPrice",
+                      parseFloat(e.target.value) || 0.1,
+                    )
                   }
                   className="h-12 text-lg pr-16"
                 />

@@ -68,6 +68,20 @@ export default function MintingProgress({
   const initTimerRef = useRef<number | null>(null);
   const originReady = !!auth?.origin;
 
+  // Add a health check function
+  const checkOriginHealth = async () => {
+    if (!auth?.origin) return false;
+    try {
+      // Simple health check - try to call a basic method
+      await auth.origin.getOriginUsage();
+      return true;
+    } catch (error) {
+      console.warn("Origin SDK health check failed, but continuing:", error);
+      // Return true anyway - the health check might fail but minting could still work
+      return true;
+    }
+  };
+
   const [mintingState, setMintingState] = useState<MintingState>({
     currentStep: 0,
     isComplete: false,
@@ -94,10 +108,36 @@ export default function MintingProgress({
       return;
     }
 
-    // Double-check that we're not still initializing
-    if (mintingState.isInitializing) {
-      console.log("Still initializing, waiting...");
-      return;
+    console.log("Starting minting process with Origin SDK...");
+
+    // Validate wallet connection and network
+    try {
+      if (typeof window !== "undefined" && window.ethereum) {
+        const accounts = await window.ethereum.request({
+          method: "eth_accounts",
+        });
+        console.log("Connected accounts:", accounts);
+        if (!accounts || accounts.length === 0) {
+          throw new Error(
+            "No wallet accounts connected. Please connect your wallet.",
+          );
+        }
+
+        // Check network
+        const chainId = await window.ethereum.request({
+          method: "eth_chainId",
+        });
+        console.log("Current chain ID:", chainId);
+
+        // Check if we're on the right network (you may need to adjust this)
+        // BaseCAMP L1 might have a specific chain ID
+        if (chainId !== "0x1" && chainId !== "0x2105") {
+          // Ethereum mainnet or Base
+          console.warn("Potentially wrong network. Chain ID:", chainId);
+        }
+      }
+    } catch (walletError) {
+      console.warn("Wallet validation warning:", walletError);
     }
 
     try {
@@ -119,11 +159,27 @@ export default function MintingProgress({
         if (!originUsage?.user?.active) {
           console.log("Setting Origin consent...");
           await auth.origin.setOriginConsent(true);
+          console.log("Origin consent set successfully");
         }
       } catch (consentError) {
         console.warn("Origin consent setup failed:", consentError);
         // Continue anyway as this might not be required for minting
       }
+
+      // Test if Origin SDK is working by calling a simple method
+      try {
+        console.log("Testing Origin SDK connectivity...");
+        const testUsage = await auth.origin.getOriginUsage();
+        console.log("Origin SDK test successful:", testUsage);
+      } catch (testError) {
+        console.warn("Origin SDK test failed:", testError);
+        throw new Error(
+          "Origin SDK is not responding properly. Please refresh and try again.",
+        );
+      }
+
+      // Additional delay to ensure all initialization is complete
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
@@ -179,6 +235,23 @@ export default function MintingProgress({
         throw new Error("File type is missing");
       }
 
+      // Additional file validation
+      if (file.size === 0) {
+        throw new Error("File is empty");
+      }
+
+      if (file.size > 100 * 1024 * 1024) {
+        // 100MB limit
+        throw new Error("File is too large (max 100MB)");
+      }
+
+      console.log("File validation passed:", {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        sizeInMB: (file.size / 1024 / 1024).toFixed(2),
+      });
+
       let tokenId: string;
 
       // Single-attempt minting (no retries)
@@ -189,25 +262,116 @@ export default function MintingProgress({
       // File minting - mint the first file
       const fileForMint = files[0];
 
-      // Ensure we have proper file metadata including name and type
+      // Create simplified metadata for Origin SDK
       const fileMetadata = {
-        ...metadata,
-        fileName: fileForMint.name,
-        fileType: fileForMint.type,
-        fileSize: fileForMint.size,
-        // Add any additional metadata from the form
         title: metadata.title || fileForMint.name,
         description: metadata.description || `File: ${fileForMint.name}`,
         category: metadata.category || "Other",
-        tags: metadata.tags || [],
+        fileName: fileForMint.name,
+        fileType: fileForMint.type,
+        fileSize: fileForMint.size,
       } as Record<string, unknown>;
+
+      // Remove any undefined or null values
+      Object.keys(fileMetadata).forEach((key) => {
+        if (fileMetadata[key] === undefined || fileMetadata[key] === null) {
+          delete fileMetadata[key];
+        }
+      });
+
+      console.log("Cleaned metadata:", fileMetadata);
+
+      // Validate and format license terms
+      console.log("Raw license terms received:", licenseTerms);
+
+      // Ensure we have valid license terms
+      if (!licenseTerms) {
+        throw new Error("License terms are missing");
+      }
+
+      // Convert and validate price - ensure we handle BigInt properly
+      let priceInWei: bigint;
+      try {
+        console.log(
+          "Processing price:",
+          licenseTerms.price,
+          typeof licenseTerms.price,
+        );
+
+        if (typeof licenseTerms.price === "bigint") {
+          priceInWei = licenseTerms.price;
+        } else if (typeof licenseTerms.price === "string") {
+          // Remove any non-numeric characters and convert
+          const cleanPrice = licenseTerms.price.replace(/[^0-9]/g, "");
+          priceInWei = BigInt(cleanPrice);
+        } else if (typeof licenseTerms.price === "number") {
+          // Convert from ETH to wei, ensuring we don't lose precision
+          const weiString = (licenseTerms.price * 1e18).toFixed(0);
+          priceInWei = BigInt(weiString);
+        } else {
+          throw new Error(`Invalid price format: ${typeof licenseTerms.price}`);
+        }
+
+        console.log("Converted price to wei:", priceInWei.toString());
+
+        if (priceInWei <= 0n) {
+          throw new Error("License price must be greater than 0");
+        }
+      } catch (error) {
+        console.error("Price conversion error:", error);
+        throw new Error(`Invalid price: ${error.message}`);
+      }
+
+      // Validate duration
+      const duration = Number(licenseTerms.duration);
+      if (!duration || duration <= 0) {
+        throw new Error("License duration must be greater than 0");
+      }
+
+      // Validate royalty
+      const royaltyBps = Number(licenseTerms.royaltyBps);
+      if (royaltyBps < 0 || royaltyBps > 10000) {
+        throw new Error(
+          "Royalty must be between 0 and 10000 basis points (0-100%)",
+        );
+      }
+
+      // Format license terms for Origin SDK
+      const paymentTokenAddress =
+        licenseTerms.paymentToken ||
+        "0x0000000000000000000000000000000000000000";
+
+      // Ensure the payment token address is properly formatted
+      if (
+        !paymentTokenAddress.startsWith("0x") ||
+        paymentTokenAddress.length !== 42
+      ) {
+        throw new Error(
+          `Invalid payment token address format: ${paymentTokenAddress}`,
+        );
+      }
+
+      const formattedLicenseTerms = {
+        price: priceInWei,
+        duration: duration,
+        royaltyBps: royaltyBps,
+        paymentToken: paymentTokenAddress as `0x${string}`, // Ensure proper Address type
+      };
+
+      console.log("Formatted license terms:", {
+        price: formattedLicenseTerms.price.toString(),
+        priceInEth: (Number(formattedLicenseTerms.price) / 1e18).toFixed(6),
+        duration: formattedLicenseTerms.duration,
+        royaltyBps: formattedLicenseTerms.royaltyBps,
+        paymentToken: formattedLicenseTerms.paymentToken,
+      });
 
       console.log("Attempting file minting...", {
         fileName: fileForMint.name,
         fileType: fileForMint.type,
         fileSize: fileForMint.size,
         fileMetadata,
-        licenseTerms,
+        formattedLicenseTerms,
       });
 
       console.log("File object details:", {
@@ -218,17 +382,88 @@ export default function MintingProgress({
         constructor: fileForMint.constructor.name,
       });
 
-      const mintedTokenId = await (auth.origin!).mintFile(
-        fileForMint as File,
-        fileMetadata,
-        licenseTerms as any,
-        undefined, // no parent
-        {
-          progressCallback: (percent: number) => {
-            console.log(`Upload progress: ${percent}%`);
+      let mintedTokenId: string;
+
+      try {
+        console.log("Calling Origin SDK mintFile with:", {
+          fileName: fileForMint.name,
+          fileSize: fileForMint.size,
+          metadataKeys: Object.keys(fileMetadata),
+          licenseTerms: {
+            price: formattedLicenseTerms.price.toString(),
+            duration: formattedLicenseTerms.duration,
+            royaltyBps: formattedLicenseTerms.royaltyBps,
+            paymentToken: formattedLicenseTerms.paymentToken,
           },
-        },
-      );
+        });
+
+        // Try with minimal metadata first to isolate the issue
+        const minimalMetadata = {
+          title: fileForMint.name,
+          description: `File: ${fileForMint.name}`,
+        };
+
+        console.log("Using minimal metadata for testing:", minimalMetadata);
+
+        mintedTokenId = await auth.origin!.mintFile(
+          fileForMint as File,
+          minimalMetadata, // Use minimal metadata for testing
+          formattedLicenseTerms,
+          undefined, // no parent
+          {
+            progressCallback: (percent: number) => {
+              console.log(`Upload progress: ${percent}%`);
+            },
+          },
+        );
+
+        console.log("Minting successful, token ID:", mintedTokenId);
+      } catch (mintError: any) {
+        console.error("Minting error details:", {
+          error: mintError,
+          message: mintError.message,
+          code: mintError.code,
+          data: mintError.data,
+          stack: mintError.stack,
+        });
+
+        // Handle specific error cases
+        if (mintError.message?.includes("status: 0x0")) {
+          throw new Error(
+            "Blockchain transaction failed (status: 0x0). This usually means:\n\n" +
+              "• Smart contract rejected the transaction due to invalid parameters\n" +
+              "• Gas limit was too low (try increasing gas limit in your wallet)\n" +
+              "• License terms are invalid (price: " +
+              (Number(formattedLicenseTerms.price) / 1e18).toFixed(6) +
+              " ETH, duration: " +
+              formattedLicenseTerms.duration +
+              "s, royalty: " +
+              formattedLicenseTerms.royaltyBps +
+              " BPS)\n" +
+              "• Network congestion or RPC issues\n\n" +
+              "Try refreshing and minting again, or adjust your license terms.",
+          );
+        } else if (
+          mintError.message?.includes("user rejected") ||
+          mintError.message?.includes("User denied")
+        ) {
+          throw new Error("Transaction was rejected by user");
+        } else if (mintError.message?.includes("insufficient funds")) {
+          throw new Error("Insufficient funds to pay for transaction gas");
+        } else if (mintError.message?.includes("nonce")) {
+          throw new Error(
+            "Transaction nonce error. Please reset your wallet account or try again.",
+          );
+        } else if (mintError.message?.includes("gas")) {
+          throw new Error(
+            "Gas estimation failed. Try increasing gas limit in your wallet or try again later.",
+          );
+        } else {
+          throw new Error(
+            `Minting failed: ${mintError.message || "Unknown error"}. Please check console for details.`,
+          );
+        }
+      }
 
       if (!mintedTokenId) {
         throw new Error("Minting did not return a token ID");
@@ -299,7 +534,6 @@ export default function MintingProgress({
     });
 
     if (!authenticated) {
-      // Instead of showing an error, keep the loading state and wait for authentication
       console.log("User not authenticated, waiting for wallet connection...");
       return;
     }
@@ -321,37 +555,44 @@ export default function MintingProgress({
       return;
     }
 
-    // Single check with a short grace delay (no repeated attempts)
-    if (originReady) {
-      console.log("Origin SDK is ready, starting minting process...");
-      setMintingState((prev) => ({ ...prev, isInitializing: false }));
-      setTimeout(() => {
-        performMinting();
-      }, 500);
-      startedRef.current = true;
-      return;
-    }
+    // Simple initialization with retries
+    let attempts = 0;
+    const maxAttempts = 5;
 
-    // One short delayed check to allow last-moment initialization
-    if (initTimerRef.current == null) {
-      initTimerRef.current = window.setTimeout(() => {
-        if (startedRef.current) return;
-        if (!!auth?.origin) {
-          console.log("Origin SDK became ready, starting minting process...");
-          setMintingState((prev) => ({ ...prev, isInitializing: false }));
-          startedRef.current = true;
+    const tryInitialize = () => {
+      attempts++;
+      console.log(`Initialization attempt ${attempts}/${maxAttempts}`);
+
+      if (auth?.origin) {
+        console.log("Origin SDK is ready, starting minting process...");
+        setMintingState((prev) => ({ ...prev, isInitializing: false }));
+        startedRef.current = true;
+
+        // Start minting after a brief delay
+        setTimeout(() => {
           performMinting();
-        } else {
-          setMintingState((prev) => ({
-            ...prev,
-            isInitializing: false,
-            error:
-              "Origin SDK is taking longer than expected to initialize. This could be due to network issues or the SDK not being properly configured. Please refresh the page and try again. If the issue persists, check your network connection and ensure the CAMP_CLIENT_ID is properly set.",
-          }));
-        }
-        initTimerRef.current = null;
-      }, 1000);
-    }
+        }, 300);
+        return;
+      }
+
+      if (attempts < maxAttempts) {
+        // Wait longer between attempts
+        const delay = attempts * 1000; // 1s, 2s, 3s, 4s, 5s
+        console.log(`Origin SDK not ready, retrying in ${delay}ms...`);
+        initTimerRef.current = window.setTimeout(tryInitialize, delay);
+      } else {
+        console.error("Origin SDK failed to initialize after maximum attempts");
+        setMintingState((prev) => ({
+          ...prev,
+          isInitializing: false,
+          error:
+            "Origin SDK failed to initialize. Please refresh the page and try again. If the issue persists, check your network connection.",
+        }));
+      }
+    };
+
+    // Start initialization
+    tryInitialize();
 
     return () => {
       if (initTimerRef.current != null) {
@@ -359,7 +600,7 @@ export default function MintingProgress({
         initTimerRef.current = null;
       }
     };
-  }, [authenticated, originReady]);
+  }, [authenticated, auth]);
 
   const progress = ((mintingState.currentStep + 1) / mintingSteps.length) * 100;
 
@@ -561,21 +802,23 @@ export default function MintingProgress({
           {mintingSteps.map((step, index) => (
             <div
               key={step.id}
-              className={`flex items-start space-x-4 p-4 rounded-xl transition-all duration-500 ${index < mintingState.currentStep
-                ? "bg-green-500/10 border border-green-500/20"
-                : index === mintingState.currentStep
-                  ? "bg-orange-500/10 border border-orange-500/20"
-                  : "bg-gray-800/30"
-                }`}
+              className={`flex items-start space-x-4 p-4 rounded-xl transition-all duration-500 ${
+                index < mintingState.currentStep
+                  ? "bg-green-500/10 border border-green-500/20"
+                  : index === mintingState.currentStep
+                    ? "bg-orange-500/10 border border-orange-500/20"
+                    : "bg-gray-800/30"
+              }`}
             >
               {/* Step Icon */}
               <div
-                className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${index < mintingState.currentStep
-                  ? "bg-green-500"
-                  : index === mintingState.currentStep
-                    ? "bg-orange-500"
-                    : "bg-gray-600"
-                  }`}
+                className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  index < mintingState.currentStep
+                    ? "bg-green-500"
+                    : index === mintingState.currentStep
+                      ? "bg-orange-500"
+                      : "bg-gray-600"
+                }`}
               >
                 {index < mintingState.currentStep ? (
                   <Check className="h-5 w-5 text-white" />
@@ -589,10 +832,11 @@ export default function MintingProgress({
               {/* Step Content */}
               <div className="flex-1">
                 <h3
-                  className={`font-semibold mb-1 ${index <= mintingState.currentStep
-                    ? "text-white"
-                    : "text-gray-400"
-                    }`}
+                  className={`font-semibold mb-1 ${
+                    index <= mintingState.currentStep
+                      ? "text-white"
+                      : "text-gray-400"
+                  }`}
                 >
                   {step.title}
                 </h3>
