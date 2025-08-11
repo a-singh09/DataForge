@@ -21,7 +21,7 @@ export interface LicensePurchaseResult {
  * Hook for managing licensing operations including purchase, access verification, and renewals
  */
 export function useLicensing() {
-  const { origin } = useAuth();
+  const auth = useAuth();
   const { authenticated } = useAuthState();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -33,7 +33,7 @@ export function useLicensing() {
       tokenId: bigint,
       periods: number = 1,
     ): Promise<LicensePurchaseResult> => {
-      if (!authenticated || !origin) {
+      if (!authenticated || !auth?.origin) {
         return {
           success: false,
           error: "Authentication required. Please connect your wallet.",
@@ -44,7 +44,7 @@ export function useLicensing() {
 
       try {
         // Use Origin SDK's buyAccessSmart method for automated payment handling
-        const result = await origin.buyAccessSmart(tokenId, periods);
+        const result = await auth.origin.buyAccessSmart(tokenId, periods);
 
         // Extract transaction hash from result
         const transactionHash =
@@ -78,15 +78,16 @@ export function useLicensing() {
         };
       }
     },
-    [authenticated, origin],
+    [authenticated, auth?.origin],
   );
 
   /**
    * Check if user has access to a specific dataset
+   * Uses subscriptionExpiry method directly since hasAccess has parameter issues
    */
   const checkAccess = useCallback(
     async (tokenId: bigint, userAddress?: string): Promise<LicenseStatus> => {
-      if (!origin || !authenticated) {
+      if (!auth?.origin || !authenticated) {
         return {
           hasAccess: false,
           isExpired: true,
@@ -94,41 +95,71 @@ export function useLicensing() {
       }
 
       try {
-        // For now, we'll use a placeholder address since walletAddress isn't available
-        // In a real implementation, this would come from the auth context
-        const address =
-          userAddress || "0x0000000000000000000000000000000000000000";
-
-        // Check access using Origin SDK
-        const hasAccess = await origin.hasAccess(
-          tokenId,
-          address as `0x${string}`,
-        );
-
-        if (!hasAccess) {
+        if (!userAddress) {
+          console.error("No wallet address provided for access check");
           return {
             hasAccess: false,
             isExpired: true,
           };
         }
 
-        // Get subscription expiry
-        const expiryTimestamp = await origin.subscriptionExpiry(
-          tokenId,
-          address,
+        console.log(
+          `Checking access for token ${tokenId} and address ${userAddress}`,
         );
-        const expiryDate = new Date(Number(expiryTimestamp) * 1000);
+
+        // Skip hasAccess method due to parameter issues, use subscriptionExpiry directly
+        console.log("Getting subscription expiry to determine access...");
+
+        let expiryTimestamp: bigint | number = 0;
+        try {
+          expiryTimestamp = await auth.origin.subscriptionExpiry(
+            tokenId,
+            userAddress as `0x${string}`,
+          );
+          console.log("Expiry timestamp:", expiryTimestamp);
+        } catch (error: any) {
+          console.error("Failed to get subscription expiry:", error.message);
+          // If the call fails, it likely means no subscription exists
+          return {
+            hasAccess: false,
+            isExpired: true,
+          };
+        }
+
+        // Convert timestamp to date and check if it's valid and not expired
+        const expiryTimestampNumber = Number(expiryTimestamp);
+        console.log("Expiry timestamp as number:", expiryTimestampNumber);
+
+        // If timestamp is 0 or very small, it means no subscription
+        if (expiryTimestampNumber <= 0) {
+          console.log("No valid subscription found (timestamp is 0)");
+          return {
+            hasAccess: false,
+            isExpired: true,
+          };
+        }
+
+        const expiryDate = new Date(expiryTimestampNumber * 1000);
         const now = new Date();
         const isExpired = expiryDate <= now;
 
+        console.log(`Expiry date: ${expiryDate}`);
+        console.log(`Current date: ${now}`);
+        console.log(`Is expired: ${isExpired}`);
+
+        const hasAccess = !isExpired;
         const daysRemaining = isExpired
           ? 0
           : Math.ceil(
               (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
             );
 
+        console.log(
+          `Final access result: hasAccess=${hasAccess}, daysRemaining=${daysRemaining}`,
+        );
+
         return {
-          hasAccess: !isExpired,
+          hasAccess,
           expiryDate,
           isExpired,
           daysRemaining,
@@ -141,7 +172,7 @@ export function useLicensing() {
         };
       }
     },
-    [origin],
+    [auth?.origin, authenticated],
   );
 
   /**
@@ -151,11 +182,19 @@ export function useLicensing() {
     async (
       tokenId: bigint,
       periods: number = 1,
+      userAddress?: string,
     ): Promise<LicensePurchaseResult> => {
-      if (!authenticated || !origin) {
+      if (!authenticated || !auth?.origin) {
         return {
           success: false,
           error: "Authentication required. Please connect your wallet.",
+        };
+      }
+
+      if (!userAddress) {
+        return {
+          success: false,
+          error: "User address required for renewal.",
         };
       }
 
@@ -163,10 +202,9 @@ export function useLicensing() {
 
       try {
         // Use Origin SDK's renewAccess method
-        // Note: The actual method signature may require additional parameters
-        const result = await origin.renewAccess(
+        const result = await auth.origin.renewAccess(
           tokenId,
-          "0x0000000000000000000000000000000000000000" as `0x${string}`,
+          userAddress as `0x${string}`,
           periods,
         );
 
@@ -198,7 +236,7 @@ export function useLicensing() {
         };
       }
     },
-    [authenticated, origin],
+    [authenticated, auth?.origin],
   );
 
   /**
@@ -206,18 +244,18 @@ export function useLicensing() {
    */
   const getLicenseTerms = useCallback(
     async (tokenId: bigint) => {
-      if (!origin) {
+      if (!auth?.origin) {
         throw new Error("Origin SDK not available");
       }
 
       try {
-        return await origin.getTerms(tokenId);
+        return await auth.origin.getTerms(tokenId);
       } catch (error) {
         console.error("Failed to get license terms:", error);
         throw error;
       }
     },
-    [origin],
+    [auth?.origin],
   );
 
   return {

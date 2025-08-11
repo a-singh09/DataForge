@@ -8,6 +8,15 @@ import {
   CheckCircle,
   RefreshCw,
 } from "lucide-react";
+
+// Type declaration for window.ethereum
+declare global {
+  interface Window {
+    ethereum?: {
+      request: (args: { method: string; params?: any[] }) => Promise<any>;
+    };
+  }
+}
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,10 +48,50 @@ export default function DatasetAccess({
   // Check access status on component mount and when dataset changes
   useEffect(() => {
     const checkLicenseStatus = async () => {
-      if (!origin) return;
+      if (!origin) {
+        console.log("No origin SDK available");
+        return;
+      }
 
       try {
-        const status = await checkAccess(dataset.tokenId);
+        // Try to get the wallet address from the provider
+        let userAddress: string | undefined;
+
+        try {
+          // Get the current accounts from the provider
+          if (window.ethereum) {
+            console.log("Getting accounts from window.ethereum...");
+            const accounts = await window.ethereum.request({
+              method: "eth_accounts",
+            });
+            console.log("Accounts from provider:", accounts);
+            if (accounts && accounts.length > 0) {
+              userAddress = accounts[0];
+              console.log("Using wallet address:", userAddress);
+            } else {
+              console.log("No accounts found in provider");
+            }
+          } else {
+            console.log("window.ethereum not available");
+          }
+        } catch (error) {
+          console.warn("Could not get wallet address from provider:", error);
+        }
+
+        if (!userAddress) {
+          console.log("No wallet address available, cannot check access");
+          setLicenseStatus({
+            hasAccess: false,
+            isExpired: true,
+          });
+          return;
+        }
+
+        console.log(
+          `About to check access for token ${dataset.tokenId} with address ${userAddress}`,
+        );
+        const status = await checkAccess(dataset.tokenId, userAddress);
+        console.log("License status check result:", status);
         setLicenseStatus(status);
       } catch (error) {
         console.error("Failed to check license status:", error);
@@ -51,6 +100,63 @@ export default function DatasetAccess({
 
     checkLicenseStatus();
   }, [dataset.tokenId, origin, checkAccess]);
+
+  // Manual refresh function
+  const refreshLicenseStatus = async () => {
+    if (!origin) return;
+
+    try {
+      // Try to get the wallet address from the provider
+      let userAddress: string | undefined;
+
+      try {
+        // Get the current accounts from the provider
+        if (window.ethereum) {
+          console.log(
+            "Manual refresh: Getting accounts from window.ethereum...",
+          );
+          const accounts = await window.ethereum.request({
+            method: "eth_accounts",
+          });
+          console.log("Manual refresh: Accounts from provider:", accounts);
+          if (accounts && accounts.length > 0) {
+            userAddress = accounts[0];
+            console.log("Manual refresh: Using wallet address:", userAddress);
+          }
+        }
+      } catch (error) {
+        console.warn("Could not get wallet address from provider:", error);
+      }
+
+      if (!userAddress) {
+        console.log("Manual refresh: No wallet address available");
+        toast({
+          title: "Refresh Failed",
+          description: "No wallet address available.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log(
+        `Manual refresh: About to check access for token ${dataset.tokenId} with address ${userAddress}`,
+      );
+      const status = await checkAccess(dataset.tokenId, userAddress);
+      console.log("Manual license status refresh result:", status);
+      setLicenseStatus(status);
+      toast({
+        title: "Status Refreshed",
+        description: "License status has been updated.",
+      });
+    } catch (error) {
+      console.error("Failed to refresh license status:", error);
+      toast({
+        title: "Refresh Failed",
+        description: "Unable to refresh license status.",
+        variant: "destructive",
+      });
+    }
+  };
 
   /**
    * Generate access token for authenticated downloads
@@ -185,9 +291,22 @@ export default function DatasetAccess({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Key className="h-5 w-5 text-orange-400" />
-          Dataset Access
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Key className="h-5 w-5 text-orange-400" />
+            Dataset Access
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={refreshLicenseStatus}
+            disabled={isLoading}
+            className="h-8 w-8 p-0"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+            />
+          </Button>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">

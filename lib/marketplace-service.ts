@@ -143,28 +143,39 @@ export class MarketplaceService {
         }
       }
 
-      // Step 3: Try to discover other IpNFTs by checking token IDs in small batches
-      // This reduces rate limiting and is more efficient
-      console.log("Attempting to discover other IpNFTs in batches...");
+      // Step 3: Fetch specific known token IDs and discover others
+      console.log("Fetching known token IDs and discovering others...");
 
-      const startTokenId = 1;
-      const batchSize = 3; // Fetch 3 tokens at a time
-      const maxBatches = 5; // Maximum 5 batches (15 tokens total)
+      // Known token IDs to fetch (including the specific one you provided)
+      const knownTokenIds = [
+        BigInt(
+          "7235602763579303523229090887911893772021989063542858376305575221240366367542",
+        ), // Your specific token
+        // BigInt("1"),
+        // BigInt("2"),
+        // BigInt("3"),
+        // BigInt("4"),
+        // BigInt("5"),
+      ];
 
-      for (let batch = 0; batch < maxBatches; batch++) {
-        const batchPromises: Promise<IpNFTMetadata | null>[] = [];
+      // Fetch known tokens in batches
+      const batchSize = 1; // Fetch 1 tokens at a time for better reliability
+      const batches = [];
 
-        // Create batch of token IDs to check
-        for (let i = 0; i < batchSize; i++) {
-          const tokenId = startTokenId + batch * batchSize + i;
-          batchPromises.push(
-            this.getIpNFTMetadata(BigInt(tokenId)).catch(() => null),
-          );
-        }
+      for (let i = 0; i < knownTokenIds.length; i += batchSize) {
+        batches.push(knownTokenIds.slice(i, i + batchSize));
+      }
+
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const batch = batches[batchIndex];
+        const batchPromises = batch.map((tokenId) =>
+          this.getIpNFTMetadata(tokenId).catch(() => null),
+        );
 
         try {
           console.log(
-            `Fetching batch ${batch + 1}/${maxBatches} (tokens ${startTokenId + batch * batchSize}-${startTokenId + batch * batchSize + batchSize - 1})`,
+            `Fetching batch ${batchIndex + 1}/${batches.length} with token IDs:`,
+            batch.map((id) => id.toString()),
           );
 
           const batchResults = await Promise.all(batchPromises);
@@ -173,16 +184,25 @@ export class MarketplaceService {
           ) as IpNFTMetadata[];
 
           console.log(
-            `Batch ${batch + 1}: Found ${validTokensInBatch.length} valid IpNFTs`,
+            `Batch ${batchIndex + 1}: Found ${validTokensInBatch.length} valid IpNFTs`,
           );
+
+          if (validTokensInBatch.length > 0) {
+            validTokensInBatch.forEach((token) => {
+              console.log(
+                `✅ Found IpNFT: ${token.title} (Token ID: ${token.tokenId})`,
+              );
+            });
+          }
+
           allIpNFTs.push(...validTokensInBatch);
 
           // Small delay between batches to be respectful to the RPC
-          if (batch < maxBatches - 1) {
-            await new Promise((resolve) => setTimeout(resolve, 500)); // 500ms delay
+          if (batchIndex < batches.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 1000)); // 1 second delay for safety
           }
         } catch (batchError) {
-          console.warn(`Batch ${batch + 1} failed:`, batchError);
+          console.warn(`Batch ${batchIndex + 1} failed:`, batchError);
           // Continue with next batch even if this one fails
         }
       }
