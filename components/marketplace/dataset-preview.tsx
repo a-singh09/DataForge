@@ -261,14 +261,14 @@ export default function DatasetPreview({
                   {dataset.license.royaltyBps / 100}%
                 </span>
               </div>
-              <Separator className="bg-gray-700" />
+              {/* <Separator className="bg-gray-700" />
               <Button
                 onClick={onLicense}
                 className="w-full bg-orange-500 hover:bg-orange-600 text-white"
               >
                 <Download className="h-4 w-4 mr-2" />
                 License Dataset
-              </Button>
+              </Button> */}
             </CardContent>
           </Card>
 

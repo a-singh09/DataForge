@@ -43,14 +43,15 @@ export function useMarketplaceData(
       });
     },
     enabled: !!marketplaceService && (options?.enabled ?? true),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes - increased from 5 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes - increased from 10 minutes
     // Avoid repeated background refetches to fetch only once per mount unless manually refetched
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    refetchOnMount: false,
+    refetchOnMount: true, // Changed to true to fetch on initial mount
+    refetchInterval: false, // Disable automatic refetching
     retry: 1,
-    keepPreviousData: true,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   });
 
   // Set up real-time updates
@@ -107,12 +108,14 @@ export function useInfiniteMarketplaceData(
     getNextPageParam: (lastPage, allPages) => {
       return lastPage.hasNextPage ? allPages.length + 1 : undefined;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes - increased from 5 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes - increased from 10 minutes
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    refetchOnMount: false,
+    refetchOnMount: true, // Changed to true to fetch on initial mount
+    refetchInterval: false, // Disable automatic refetching
     retry: 1,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   });
 
   const allItems = useMemo(() => {

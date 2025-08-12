@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "./useAuth";
 import { useAuthState } from "@campnetwork/origin/react";
 
@@ -24,6 +24,31 @@ export function useLicensing() {
   const auth = useAuth();
   const { authenticated } = useAuthState();
   const [isLoading, setIsLoading] = useState(false);
+
+  // Cache for access checks to prevent repeated API calls
+  const [accessCache, setAccessCache] = useState<
+    Map<string, { result: LicenseStatus; timestamp: number }>
+  >(new Map());
+  const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes cache
+
+  // Cleanup old cache entries periodically
+  useEffect(() => {
+    const cleanup = () => {
+      const now = Date.now();
+      setAccessCache((prev) => {
+        const newCache = new Map();
+        for (const [key, value] of prev.entries()) {
+          if (now - value.timestamp < CACHE_DURATION) {
+            newCache.set(key, value);
+          }
+        }
+        return newCache;
+      });
+    };
+
+    const interval = setInterval(cleanup, CACHE_DURATION);
+    return () => clearInterval(interval);
+  }, [CACHE_DURATION]);
 
   /**
    * Purchase a license for a dataset using Origin SDK's buyAccessSmart method
@@ -94,15 +119,25 @@ export function useLicensing() {
         };
       }
 
-      try {
-        if (!userAddress) {
-          console.error("No wallet address provided for access check");
-          return {
-            hasAccess: false,
-            isExpired: true,
-          };
-        }
+      if (!userAddress) {
+        console.error("No wallet address provided for access check");
+        return {
+          hasAccess: false,
+          isExpired: true,
+        };
+      }
 
+      // Check cache first
+      const cacheKey = `${tokenId.toString()}-${userAddress}`;
+      const cached = accessCache.get(cacheKey);
+      const now = Date.now();
+
+      if (cached && now - cached.timestamp < CACHE_DURATION) {
+        console.log(`Using cached access result for token ${tokenId}`);
+        return cached.result;
+      }
+
+      try {
         console.log(
           `Checking access for token ${tokenId} and address ${userAddress}`,
         );
@@ -120,10 +155,16 @@ export function useLicensing() {
         } catch (error: any) {
           console.error("Failed to get subscription expiry:", error.message);
           // If the call fails, it likely means no subscription exists
-          return {
+          const result = {
             hasAccess: false,
             isExpired: true,
           };
+
+          // Cache negative results for shorter duration
+          setAccessCache((prev) =>
+            new Map(prev).set(cacheKey, { result, timestamp: now }),
+          );
+          return result;
         }
 
         // Convert timestamp to date and check if it's valid and not expired
@@ -133,46 +174,66 @@ export function useLicensing() {
         // If timestamp is 0 or very small, it means no subscription
         if (expiryTimestampNumber <= 0) {
           console.log("No valid subscription found (timestamp is 0)");
-          return {
+          const result = {
             hasAccess: false,
             isExpired: true,
           };
+
+          // Cache negative results
+          setAccessCache((prev) =>
+            new Map(prev).set(cacheKey, { result, timestamp: now }),
+          );
+          return result;
         }
 
         const expiryDate = new Date(expiryTimestampNumber * 1000);
-        const now = new Date();
-        const isExpired = expiryDate <= now;
+        const currentTime = new Date();
+        const isExpired = expiryDate <= currentTime;
 
         console.log(`Expiry date: ${expiryDate}`);
-        console.log(`Current date: ${now}`);
+        console.log(`Current date: ${currentTime}`);
         console.log(`Is expired: ${isExpired}`);
 
         const hasAccess = !isExpired;
         const daysRemaining = isExpired
           ? 0
           : Math.ceil(
-              (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+              (expiryDate.getTime() - currentTime.getTime()) /
+                (1000 * 60 * 60 * 24),
             );
 
         console.log(
           `Final access result: hasAccess=${hasAccess}, daysRemaining=${daysRemaining}`,
         );
 
-        return {
+        const result = {
           hasAccess,
           expiryDate,
           isExpired,
           daysRemaining,
         };
+
+        // Cache the result
+        setAccessCache((prev) =>
+          new Map(prev).set(cacheKey, { result, timestamp: now }),
+        );
+
+        return result;
       } catch (error) {
         console.error("Access check failed:", error);
-        return {
+        const result = {
           hasAccess: false,
           isExpired: true,
         };
+
+        // Cache error results for shorter duration
+        setAccessCache((prev) =>
+          new Map(prev).set(cacheKey, { result, timestamp: now }),
+        );
+        return result;
       }
     },
-    [auth?.origin, authenticated],
+    [auth?.origin, authenticated, accessCache, CACHE_DURATION],
   );
 
   /**
@@ -312,6 +373,13 @@ export function useLicensing() {
     [auth?.origin],
   );
 
+  /**
+   * Clear the access cache (useful after purchases/renewals)
+   */
+  const clearAccessCache = useCallback(() => {
+    setAccessCache(new Map());
+  }, []);
+
   return {
     // State
     isLoading,
@@ -323,5 +391,6 @@ export function useLicensing() {
     renewAccess,
     getLicenseTerms,
     getContentUrl,
+    clearAccessCache,
   };
 }

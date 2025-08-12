@@ -214,6 +214,9 @@ export default function ProfilePage() {
               </CardContent>
             </Card>
 
+            {/* Subscriptions */}
+            <Subscriptions />
+
             {/* Social Accounts */}
             <Card className="glass border-gray-800">
               <CardHeader>
@@ -263,7 +266,6 @@ export default function ProfilePage() {
             </Card>
 
             {/* Transaction History */}
-            <Subscriptions />
             <TransactionHistory />
           </div>
 

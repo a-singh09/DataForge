@@ -15,6 +15,10 @@ export class MarketplaceService {
   > = new Map();
   private static cacheTtlMs = 30 * 1000; // 30 seconds
 
+  // Rate limiting
+  private static lastRequestTime = 0;
+  private static minRequestInterval = 100; // 100ms between requests
+
   constructor(auth: Auth) {
     this.auth = auth;
   }
@@ -172,6 +176,9 @@ export class MarketplaceService {
         const knownTokenIds = [
           BigInt(
             "7235602763579303523229090887911893772021989063542858376305575221240366367542",
+          ),
+          BigInt(
+            "27885520041093658585303584173082111687028681907098281542498800404897098505874",
           ),
         ];
 

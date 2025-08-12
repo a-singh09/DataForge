@@ -13,7 +13,10 @@ import {
 } from "@/components/ui/select";
 import DatasetCard from "@/components/marketplace/dataset-card";
 import FilterSidebar from "@/components/marketplace/filter-sidebar";
-import { MarketplaceProvider, useMarketplaceContext } from "@/components/marketplace/marketplace-provider";
+import {
+  MarketplaceProvider,
+  useMarketplaceContext,
+} from "@/components/marketplace/marketplace-provider";
 import { useAuthState } from "@campnetwork/origin/react";
 import { toast } from "@/hooks/use-toast";
 
@@ -33,13 +36,17 @@ function MarketplaceContent() {
   const error = ctx.error;
   const refetch = ctx.refetch;
 
-  // Sync local search/sort with marketplace context filters
+  // Debounce search query updates to prevent excessive API calls
   useEffect(() => {
-    ctx.updateFilters({
-      searchQuery: searchQuery.trim() || undefined,
-      sortBy,
-    });
-  }, [searchQuery, sortBy]);
+    const timeoutId = setTimeout(() => {
+      ctx.updateFilters({
+        searchQuery: searchQuery.trim() || undefined,
+        sortBy,
+      });
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, sortBy, ctx]);
 
   // Fetch trending datasets for the hero section (currently unused but ready for future features)
   // const { data: trendingDatasets, isLoading: isTrendingLoading } = useTrendingIpNFTs(6);

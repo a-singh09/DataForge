@@ -97,12 +97,12 @@ export default function Header() {
                           Profile
                         </Link>
                       </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
+                      {/* <DropdownMenuItem asChild>
                         <Link href="/ai-dashboard" className="cursor-pointer">
                           <Settings className="h-4 w-4 mr-2" />
                           AI Dashboard
                         </Link>
-                      </DropdownMenuItem>
+                      </DropdownMenuItem> */}
                       <DropdownMenuItem
                         onClick={auth.disconnect}
                         className="cursor-pointer text-red-400"
