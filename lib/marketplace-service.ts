@@ -148,31 +148,12 @@ export class MarketplaceService {
         //   return await this.getMockMarketplaceData(params);
         // }
 
-        // Step 1: Get current user's uploads (real data)
-        const userUploads = await this.auth.origin.getOriginUploads();
-        console.log("User uploads found:", userUploads?.length || 0);
+        // Fetch only the known token IDs for marketplace display
+        console.log("Fetching known token IDs for marketplace...");
 
         const allIpNFTs: IpNFTMetadata[] = [];
 
-        // Step 2: Process user uploads
-        if (userUploads && userUploads.length > 0) {
-          for (const upload of userUploads) {
-            try {
-              const tokenId = BigInt(upload.tokenId || upload.id || 1);
-              const metadata = await this.getIpNFTMetadata(tokenId);
-              if (metadata) {
-                allIpNFTs.push(metadata);
-              }
-            } catch (error) {
-              console.warn("Failed to fetch upload metadata:", error);
-            }
-          }
-        }
-
-        // Step 3: Fetch specific known token IDs and discover others
-        console.log("Fetching known token IDs and discovering others...");
-
-        // Known token IDs to fetch (including the specific one you provided)
+        // Known token IDs to fetch (these are the actual marketplace items)
         const knownTokenIds = [
           BigInt(
             "7235602763579303523229090887911893772021989063542858376305575221240366367542",
@@ -188,57 +169,36 @@ export class MarketplaceService {
           ),
         ];
 
-        // Fetch known tokens in batches
-        const batchSize = 1; // Fetch 1 tokens at a time for better reliability
-        const batches = [] as bigint[][];
-
-        for (let i = 0; i < knownTokenIds.length; i += batchSize) {
-          batches.push(knownTokenIds.slice(i, i + batchSize));
-        }
-
-        for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-          const batch = batches[batchIndex];
-          const batchPromises = batch.map((tokenId) =>
-            this.getIpNFTMetadata(tokenId).catch(() => null),
-          );
-
+        // Fetch known tokens sequentially to avoid overwhelming the RPC
+        for (let i = 0; i < knownTokenIds.length; i++) {
+          const tokenId = knownTokenIds[i];
           try {
             console.log(
-              `Fetching batch ${batchIndex + 1}/${batches.length} with token IDs:`,
-              batch.map((id) => id.toString()),
+              `Fetching token ${i + 1}/${knownTokenIds.length}: ${tokenId.toString()}`,
             );
 
-            const batchResults = await Promise.all(batchPromises);
-            const validTokensInBatch = batchResults.filter(
-              Boolean,
-            ) as IpNFTMetadata[];
-
-            console.log(
-              `Batch ${batchIndex + 1}: Found ${validTokensInBatch.length} valid IpNFTs`,
-            );
-
-            if (validTokensInBatch.length > 0) {
-              validTokensInBatch.forEach((token) => {
-                console.log(
-                  `✅ Found IpNFT: ${token.title} (Token ID: ${token.tokenId})`,
-                );
-              });
+            const metadata = await this.getIpNFTMetadata(tokenId);
+            if (metadata) {
+              console.log(
+                `✅ Found IpNFT: ${metadata.title} (Token ID: ${metadata.tokenId})`,
+              );
+              allIpNFTs.push(metadata);
+            } else {
+              console.warn(`❌ No metadata found for token ${tokenId}`);
             }
 
-            allIpNFTs.push(...validTokensInBatch);
-
-            // Small delay between batches to be respectful to the RPC
-            if (batchIndex < batches.length - 1) {
-              await new Promise((resolve) => setTimeout(resolve, 1000));
+            // Small delay between requests to be respectful to the RPC
+            if (i < knownTokenIds.length - 1) {
+              await new Promise((resolve) => setTimeout(resolve, 500));
             }
-          } catch (batchError) {
-            console.warn(`Batch ${batchIndex + 1} failed:`, batchError);
-            // Continue with next batch even if this one fails
+          } catch (error) {
+            console.warn(`Failed to fetch token ${tokenId}:`, error);
+            // Continue with next token even if this one fails
           }
         }
 
         console.log(
-          `Discovery complete: Found ${allIpNFTs.length - (userUploads?.length || 0)} additional IpNFTs`,
+          `Marketplace data fetch complete: Found ${allIpNFTs.length} IpNFTs`,
         );
 
         // Remove duplicates based on tokenId
