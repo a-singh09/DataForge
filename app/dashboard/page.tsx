@@ -55,14 +55,14 @@ export default function DashboardPage() {
     getTotalContent,
   } = useCreatorAnalytics();
 
-  // Calculate dynamic key metrics from Origin SDK data
+  // Calculate dynamic key metrics from real Origin SDK data
   const keyMetrics = [
     {
       title: "Total Earnings",
       value: analyticsLoading
         ? "..."
         : `${Number(formatEther(getTotalEarnings())).toFixed(4)} ETH`,
-      change: "+23.5%", // This would be calculated from historical data
+      change: revenueData ? `${revenueData.totalLicenses} licenses` : "No data",
       changeType: "positive" as const,
       icon: DollarSign,
       color: "text-green-400",
@@ -70,7 +70,7 @@ export default function DashboardPage() {
     {
       title: "Active Licenses",
       value: analyticsLoading ? "..." : getActiveLicenses().toString(),
-      change: "+12",
+      change: revenueData ? `${revenueData.totalLicenses} total` : "No data",
       changeType: "positive" as const,
       icon: FileText,
       color: "text-blue-400",
@@ -78,7 +78,7 @@ export default function DashboardPage() {
     {
       title: "Content Minted",
       value: analyticsLoading ? "..." : getTotalContent().toString(),
-      change: "+8",
+      change: uploads ? `${uploads.length} IpNFTs` : "No uploads",
       changeType: "positive" as const,
       icon: Eye,
       color: "text-purple-400",

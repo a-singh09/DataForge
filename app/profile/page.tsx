@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from "react";
 import {
   Wallet,
   Twitter,
@@ -14,55 +14,71 @@ import {
   Copy,
   Check,
   Edit,
-  RefreshCw
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import TransactionHistory from '@/components/profile/transaction-history';
-import Subscriptions from '@/components/profile/subscriptions';
-import Link from 'next/link';
-import { useLicensing } from '@/hooks/useLicensing';
-import { toast } from '@/hooks/use-toast';
+  RefreshCw,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import TransactionHistory from "@/components/profile/transaction-history";
+import Subscriptions from "@/components/profile/subscriptions";
+import Link from "next/link";
+import { useLicensing } from "@/hooks/useLicensing";
+import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { useAuthState } from "@campnetwork/origin/react";
+import useCreatorAnalytics from "@/hooks/useCreatorAnalytics";
+import { useWalletBalance } from "@/hooks/useWalletBalance";
 
 const socialPlatforms = [
   {
-    id: 'twitter',
-    name: 'Twitter',
+    id: "twitter",
+    name: "Twitter",
     icon: Twitter,
     connected: true,
-    username: '@creator_vault',
-    color: 'text-blue-400'
+    username: "@creator_vault",
+    color: "text-blue-400",
   },
   {
-    id: 'spotify',
-    name: 'Spotify',
+    id: "spotify",
+    name: "Spotify",
     icon: Music,
     connected: true,
-    username: 'CreatorVault Music',
-    color: 'text-green-400'
+    username: "CreatorVault Music",
+    color: "text-green-400",
   },
   {
-    id: 'tiktok',
-    name: 'TikTok',
+    id: "tiktok",
+    name: "TikTok",
     icon: MessageSquare,
     connected: false,
     username: null,
-    color: 'text-pink-400'
+    color: "text-pink-400",
   },
   {
-    id: 'telegram',
-    name: 'Telegram',
+    id: "telegram",
+    name: "Telegram",
     icon: Send,
     connected: false,
     username: null,
-    color: 'text-blue-500'
-  }
+    color: "text-blue-500",
+  },
 ];
 
 export default function ProfilePage() {
@@ -71,16 +87,43 @@ export default function ProfilePage() {
   const [renewTokenId, setRenewTokenId] = useState<string>("");
   const [renewPeriods, setRenewPeriods] = useState<number>(1);
   const [isRenewing, setIsRenewing] = useState<boolean>(false);
+  const { auth } = useAuth();
+  const { authenticated } = useAuthState();
+  const { usageStats, isLoading: analyticsLoading } = useCreatorAnalytics();
+  const { balance: walletBalance, isLoading: balanceLoading } =
+    useWalletBalance();
   const [preferences, setPreferences] = useState({
-    defaultLicenseDuration: '365',
+    defaultLicenseDuration: "365",
     defaultRoyalty: 95,
     emailNotifications: true,
     pushNotifications: false,
     publicProfile: true,
-    showEarnings: false
+    showEarnings: false,
   });
 
-  const walletAddress = '0x1234567890abcdef1234567890abcdef12345678';
+  // Get wallet address from auth context or provider
+  const [walletAddress, setWalletAddress] = useState<string>("");
+
+  useEffect(() => {
+    const getWalletAddr = async () => {
+      try {
+        if (typeof window !== "undefined" && (window as any).ethereum) {
+          const accounts = await (window as any).ethereum.request({
+            method: "eth_accounts",
+          });
+          if (accounts && accounts.length > 0) {
+            setWalletAddress(accounts[0]);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to get wallet address:", error);
+      }
+    };
+
+    if (authenticated) {
+      getWalletAddr();
+    }
+  }, [authenticated]);
 
   const copyAddress = () => {
     navigator.clipboard.writeText(walletAddress);
@@ -90,8 +133,10 @@ export default function ProfilePage() {
 
   const getWalletAddress = async (): Promise<string | undefined> => {
     try {
-      if (typeof window !== 'undefined' && (window as any).ethereum) {
-        const accounts = await (window as any).ethereum.request({ method: 'eth_accounts' });
+      if (typeof window !== "undefined" && (window as any).ethereum) {
+        const accounts = await (window as any).ethereum.request({
+          method: "eth_accounts",
+        });
         if (accounts && accounts.length > 0) return accounts[0] as string;
       }
     } catch (_) {
@@ -102,38 +147,65 @@ export default function ProfilePage() {
 
   const handleRenew = async () => {
     if (!renewTokenId) {
-      toast({ title: 'Token ID required', description: 'Enter a valid token ID to renew access.', variant: 'destructive' });
+      toast({
+        title: "Token ID required",
+        description: "Enter a valid token ID to renew access.",
+        variant: "destructive",
+      });
       return;
     }
     if (renewPeriods < 1) {
-      toast({ title: 'Invalid periods', description: 'Periods must be at least 1.', variant: 'destructive' });
+      toast({
+        title: "Invalid periods",
+        description: "Periods must be at least 1.",
+        variant: "destructive",
+      });
       return;
     }
     setIsRenewing(true);
     try {
       const addr = await getWalletAddress();
       if (!addr) {
-        toast({ title: 'No wallet detected', description: 'Connect your wallet first, then try again.', variant: 'destructive' });
+        toast({
+          title: "No wallet detected",
+          description: "Connect your wallet first, then try again.",
+          variant: "destructive",
+        });
         setIsRenewing(false);
         return;
       }
-      const result = await renewAccess(BigInt(renewTokenId), renewPeriods, addr as `0x${string}`);
+      const result = await renewAccess(
+        BigInt(renewTokenId),
+        renewPeriods,
+        addr as `0x${string}`,
+      );
       if (result.success) {
-        toast({ title: 'Renewal successful', description: `Tx: ${result.transactionHash?.slice(0, 10)}...` });
+        toast({
+          title: "Renewal successful",
+          description: `Tx: ${result.transactionHash?.slice(0, 10)}...`,
+        });
         setRenewTokenId("");
         setRenewPeriods(1);
       } else {
-        toast({ title: 'Renewal failed', description: result.error || 'Please try again.', variant: 'destructive' });
+        toast({
+          title: "Renewal failed",
+          description: result.error || "Please try again.",
+          variant: "destructive",
+        });
       }
     } catch (err: any) {
-      toast({ title: 'Renewal failed', description: err?.message || 'Please try again.', variant: 'destructive' });
+      toast({
+        title: "Renewal failed",
+        description: err?.message || "Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsRenewing(false);
     }
   };
 
   const handlePreferenceChange = (key: string, value: any) => {
-    setPreferences(prev => ({ ...prev, [key]: value }));
+    setPreferences((prev) => ({ ...prev, [key]: value }));
   };
 
   return (
@@ -179,7 +251,9 @@ export default function ProfilePage() {
                   <div>
                     <p className="text-sm text-gray-400 mb-1">Wallet Address</p>
                     <p className="font-mono text-sm text-white">
-                      {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+                      {walletAddress
+                        ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
+                        : "Not connected"}
                     </p>
                   </div>
                   <Button
@@ -193,7 +267,7 @@ export default function ProfilePage() {
                     ) : (
                       <Copy className="h-4 w-4 mr-1" />
                     )}
-                    {copied ? 'Copied' : 'Copy'}
+                    {copied ? "Copied" : "Copy"}
                   </Button>
                 </div>
 
@@ -203,64 +277,102 @@ export default function ProfilePage() {
                     <p className="font-semibold text-green-400">BaseCAMP L1</p>
                   </div>
                   <div className="text-center p-4 bg-gray-800/30 rounded-lg">
-                    <p className="text-sm text-gray-400">Balance</p>
-                    <p className="font-semibold text-white">12.47 ETH</p>
+                    <p className="text-sm text-gray-400">Origin Multiplier</p>
+                    <p className="font-semibold text-orange-400">
+                      {analyticsLoading
+                        ? "..."
+                        : `${usageStats?.user?.multiplier || 1}x`}
+                    </p>
                   </div>
                   <div className="text-center p-4 bg-gray-800/30 rounded-lg">
-                    <p className="text-sm text-gray-400">Status</p>
-                    <Badge className="bg-green-500/20 text-green-400">Connected</Badge>
+                    <p className="text-sm text-gray-400">Origin Status</p>
+                    <Badge
+                      className={`${usageStats?.user?.active ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-400"}`}
+                    >
+                      {analyticsLoading
+                        ? "Loading..."
+                        : usageStats?.user?.active
+                          ? "Active"
+                          : "Inactive"}
+                    </Badge>
                   </div>
                 </div>
+
+                {/* Wallet Balance */}
+                <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium text-blue-400">
+                      Wallet Balance
+                    </h4>
+                    <span className="text-lg font-bold text-blue-400">
+                      {balanceLoading ? "..." : `${walletBalance} ETH`}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-400">
+                    Your current wallet balance for purchasing licenses
+                  </p>
+                </div>
+
+                {/* Origin Stats */}
+                {usageStats && (
+                  <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium text-orange-400">
+                        Origin Points
+                      </h4>
+                      <span className="text-lg font-bold text-orange-400">
+                        {usageStats.user?.points.toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-400">
+                      Earn points by uploading content and engaging with the
+                      platform
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
             {/* Subscriptions */}
             <Subscriptions />
 
-            {/* Social Accounts */}
+            {/* Content Management */}
             <Card className="glass border-gray-800">
               <CardHeader>
-                <CardTitle>Social Accounts</CardTitle>
+                <CardTitle>Content Management</CardTitle>
                 <CardDescription>
-                  Link your social platforms to mint content directly
+                  Manage your uploaded content and licensing terms
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {socialPlatforms.map((platform) => {
-                    const Icon = platform.icon;
-                    return (
-                      <div key={platform.id} className="flex items-center justify-between p-4 bg-gray-800/30 rounded-lg">
-                        <div className="flex items-center space-x-4">
-                          <div className="h-10 w-10 bg-gray-800 rounded-lg flex items-center justify-center">
-                            <Icon className={`h-5 w-5 ${platform.color}`} />
-                          </div>
-                          <div>
-                            <p className="font-medium text-white">{platform.name}</p>
-                            {platform.connected ? (
-                              <p className="text-sm text-gray-400">{platform.username}</p>
-                            ) : (
-                              <p className="text-sm text-gray-500">Not connected</p>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center space-x-3">
-                          {platform.connected && (
-                            <Badge className="bg-green-500/20 text-green-400">
-                              Connected
-                            </Badge>
-                          )}
-                          <Button
-                            variant={platform.connected ? "outline" : "default"}
-                            size="sm"
-                          >
-                            {platform.connected ? 'Disconnect' : 'Connect'}
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  <div className="p-4 bg-gray-800/30 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-gray-400">
+                        Total Content
+                      </span>
+                      <span className="font-medium text-white">
+                        {analyticsLoading
+                          ? "..."
+                          : usageStats?.dataSources?.length || 0}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-400">
+                        Data Sources
+                      </span>
+                      <span className="font-medium text-white">
+                        {analyticsLoading
+                          ? "..."
+                          : usageStats?.dataSources?.length || 0}
+                      </span>
+                    </div>
+                  </div>
+                  <Link href="/dashboard">
+                    <Button className="w-full bg-orange-500 hover:bg-orange-600">
+                      Manage Content
+                    </Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>
@@ -281,7 +393,10 @@ export default function ProfilePage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-3">
-                  <p className="text-sm text-gray-300">Renew your dataset access when a license is about to expire or has expired.</p>
+                  <p className="text-sm text-gray-300">
+                    Renew your dataset access when a license is about to expire
+                    or has expired.
+                  </p>
                   <div className="grid grid-cols-1 gap-3">
                     <div>
                       <Label htmlFor="renew-token">Token ID</Label>
@@ -301,11 +416,17 @@ export default function ProfilePage() {
                         min={1}
                         max={12}
                         value={renewPeriods}
-                        onChange={(e) => setRenewPeriods(Math.max(1, Number(e.target.value)))}
+                        onChange={(e) =>
+                          setRenewPeriods(Math.max(1, Number(e.target.value)))
+                        }
                         className="mt-1"
                       />
                     </div>
-                    <Button onClick={handleRenew} disabled={isRenewing} className="bg-orange-500 hover:bg-orange-600">
+                    <Button
+                      onClick={handleRenew}
+                      disabled={isRenewing}
+                      className="bg-orange-500 hover:bg-orange-600"
+                    >
                       {isRenewing ? (
                         <>
                           <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -324,9 +445,14 @@ export default function ProfilePage() {
                 <Separator />
 
                 <div className="space-y-2">
-                  <p className="text-sm text-gray-300">Creator tip: after licenses expire, you can revise terms (price, duration, royalty) to encourage renewals.</p>
+                  <p className="text-sm text-gray-300">
+                    Creator tip: after licenses expire, you can revise terms
+                    (price, duration, royalty) to encourage renewals.
+                  </p>
                   <Link href="/dashboard">
-                    <Button variant="outline" className="w-full">Revise License Terms</Button>
+                    <Button variant="outline" className="w-full">
+                      Revise License Terms
+                    </Button>
                   </Link>
                 </div>
               </CardContent>
@@ -347,7 +473,9 @@ export default function ProfilePage() {
                   </Label>
                   <Select
                     value={preferences.defaultLicenseDuration}
-                    onValueChange={(value) => handlePreferenceChange('defaultLicenseDuration', value)}
+                    onValueChange={(value) =>
+                      handlePreferenceChange("defaultLicenseDuration", value)
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -370,7 +498,12 @@ export default function ProfilePage() {
                     min="85"
                     max="98"
                     value={preferences.defaultRoyalty}
-                    onChange={(e) => handlePreferenceChange('defaultRoyalty', parseInt(e.target.value))}
+                    onChange={(e) =>
+                      handlePreferenceChange(
+                        "defaultRoyalty",
+                        parseInt(e.target.value),
+                      )
+                    }
                   />
                 </div>
 
@@ -384,19 +517,27 @@ export default function ProfilePage() {
                   </h4>
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="email-notifications">Email Notifications</Label>
+                      <Label htmlFor="email-notifications">
+                        Email Notifications
+                      </Label>
                       <Switch
                         id="email-notifications"
                         checked={preferences.emailNotifications}
-                        onCheckedChange={(checked) => handlePreferenceChange('emailNotifications', checked)}
+                        onCheckedChange={(checked) =>
+                          handlePreferenceChange("emailNotifications", checked)
+                        }
                       />
                     </div>
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="push-notifications">Push Notifications</Label>
+                      <Label htmlFor="push-notifications">
+                        Push Notifications
+                      </Label>
                       <Switch
                         id="push-notifications"
                         checked={preferences.pushNotifications}
-                        onCheckedChange={(checked) => handlePreferenceChange('pushNotifications', checked)}
+                        onCheckedChange={(checked) =>
+                          handlePreferenceChange("pushNotifications", checked)
+                        }
                       />
                     </div>
                   </div>
@@ -416,7 +557,9 @@ export default function ProfilePage() {
                       <Switch
                         id="public-profile"
                         checked={preferences.publicProfile}
-                        onCheckedChange={(checked) => handlePreferenceChange('publicProfile', checked)}
+                        onCheckedChange={(checked) =>
+                          handlePreferenceChange("publicProfile", checked)
+                        }
                       />
                     </div>
                     <div className="flex items-center justify-between">
@@ -424,7 +567,9 @@ export default function ProfilePage() {
                       <Switch
                         id="show-earnings"
                         checked={preferences.showEarnings}
-                        onCheckedChange={(checked) => handlePreferenceChange('showEarnings', checked)}
+                        onCheckedChange={(checked) =>
+                          handlePreferenceChange("showEarnings", checked)
+                        }
                       />
                     </div>
                   </div>
@@ -446,7 +591,10 @@ export default function ProfilePage() {
                   <Shield className="h-4 w-4 mr-2" />
                   Security Settings
                 </Button>
-                <Button variant="outline" className="w-full justify-start text-red-400 hover:text-red-300">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-red-400 hover:text-red-300"
+                >
                   <Settings className="h-4 w-4 mr-2" />
                   Account Settings
                 </Button>

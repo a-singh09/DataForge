@@ -1,37 +1,41 @@
 "use client";
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { 
-  Upload, 
-  FileText, 
-  Image, 
-  Music, 
-  Video, 
-  Code, 
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import {
+  Upload,
+  FileText,
+  Image,
+  Music,
+  Video,
+  Code,
   Hash,
   ArrowRight,
-  ArrowLeft
-} from 'lucide-react';
-import ContentSelection from '@/components/upload/content-selection';
-import FileUpload from '@/components/upload/file-upload';
-import SocialMint from '@/components/upload/social-mint';
-import MetadataForm from '@/components/upload/metadata-form';
-import LicensingForm from '@/components/upload/licensing-form';
-import MintingProgress from '@/components/upload/minting-progress';
+  ArrowLeft,
+  Loader2,
+} from "lucide-react";
+import UploadWrapper from "@/components/upload/upload-wrapper";
+import ContentSelection from "@/components/upload/content-selection";
+import FileUpload from "@/components/upload/file-upload";
+import SocialMint from "@/components/upload/social-mint";
+import MetadataForm from "@/components/upload/metadata-form";
+import LicensingForm from "@/components/upload/licensing-form";
+import MintingProgress from "@/components/upload/minting-progress";
+import DebugOrigin from "@/components/upload/debug-origin";
+import SimpleFileUpload from "@/components/upload/simple-file-upload";
 
 const steps = [
-  { id: 'selection', title: 'Content Type', icon: Upload },
-  { id: 'upload', title: 'Upload Content', icon: FileText },
-  { id: 'metadata', title: 'Add Metadata', icon: Hash },
-  { id: 'licensing', title: 'Set License', icon: Code },
-  { id: 'minting', title: 'Mint IpNFT', icon: Image },
+  { id: "selection", title: "Content Type", icon: Upload },
+  { id: "upload", title: "Upload Content", icon: FileText },
+  { id: "metadata", title: "Add Metadata", icon: Hash },
+  { id: "licensing", title: "Set License", icon: Code },
+  { id: "minting", title: "Mint IpNFT", icon: Image },
 ];
 
-export default function UploadPage() {
+function UploadContent() {
   const [currentStep, setCurrentStep] = useState(0);
-  const [uploadType, setUploadType] = useState<'file' | 'social' | null>(null);
+  const [uploadType, setUploadType] = useState<"file" | "social" | null>(null);
   const [uploadData, setUploadData] = useState<any>({});
 
   const progress = ((currentStep + 1) / steps.length) * 100;
@@ -63,7 +67,7 @@ export default function UploadPage() {
           />
         );
       case 1:
-        return uploadType === 'file' ? (
+        return uploadType === "file" ? (
           <FileUpload
             onDataChange={handleStepData}
             onNext={handleNext}
@@ -98,7 +102,10 @@ export default function UploadPage() {
         return (
           <MintingProgress
             data={uploadData}
-            onComplete={() => {}}
+            onComplete={() => {
+              // Redirect to dashboard or marketplace after successful minting
+              // window.location.href = "/dashboard";
+            }}
           />
         );
       default:
@@ -116,7 +123,8 @@ export default function UploadPage() {
               Mint Your <span className="gradient-text">Content</span>
             </h1>
             <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-              Transform your creative work into licensed IpNFTs and start earning from AI companies
+              Transform your creative work into licensed IpNFTs and start
+              earning from AI companies
             </p>
           </div>
 
@@ -126,7 +134,9 @@ export default function UploadPage() {
               <Progress value={progress} className="h-2" />
             </div>
             <div className="flex justify-between text-sm text-gray-400">
-              <span>Step {currentStep + 1} of {steps.length}</span>
+              <span>
+                Step {currentStep + 1} of {steps.length}
+              </span>
               <span>{Math.round(progress)}% Complete</span>
             </div>
           </div>
@@ -144,25 +154,39 @@ export default function UploadPage() {
                   key={step.id}
                   className={`flex items-center space-x-3 px-4 py-2 rounded-lg transition-all duration-300 ${
                     index === currentStep
-                      ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                      ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
                       : index < currentStep
-                      ? 'bg-green-500/20 text-green-400'
-                      : 'text-gray-500'
+                        ? "bg-green-500/20 text-green-400"
+                        : "text-gray-500"
                   }`}
                 >
                   <Icon className="h-5 w-5" />
-                  <span className="font-medium whitespace-nowrap">{step.title}</span>
+                  <span className="font-medium whitespace-nowrap">
+                    {step.title}
+                  </span>
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* Step Content */}
-        <div className="max-w-4xl mx-auto">
-          {renderStepContent()}
+        {/* Debug Components - Remove these in production */}
+        <div className="max-w-4xl mx-auto mb-8 space-y-4">
+          <DebugOrigin />
+          <SimpleFileUpload />
         </div>
+
+        {/* Step Content */}
+        <div className="max-w-4xl mx-auto">{renderStepContent()}</div>
       </div>
     </div>
+  );
+}
+
+export default function UploadPage() {
+  return (
+    <UploadWrapper>
+      <UploadContent />
+    </UploadWrapper>
   );
 }

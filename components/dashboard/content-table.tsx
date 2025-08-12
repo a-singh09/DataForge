@@ -190,7 +190,8 @@ export default function ContentTable() {
   const [editingContent, setEditingContent] = useState<any>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-  const { uploads, isLoading, error, refetchUploads } = useCreatorAnalytics();
+  const { uploads, contentInsights, isLoading, error, refetchUploads } =
+    useCreatorAnalytics();
   const { auth } = useAuth();
 
   // Filter content based on search and filters
@@ -231,20 +232,14 @@ export default function ContentTable() {
           "0x0000000000000000000000000000000000000000" as `0x${string}`, // Native token
       };
 
-      // Get the current user's address - this might be needed for updateTerms
-      // For now, we'll use a placeholder or try to get it from the auth context
-      const userAddress =
-        "0x0000000000000000000000000000000000000000" as `0x${string}`;
-      await auth.origin.updateTerms(BigInt(tokenId), userAddress, newTerms);
+      await auth.origin.updateTerms(BigInt(tokenId), newTerms);
 
       // Refresh the data
       refetchUploads();
 
-      // Show success message (you might want to add a toast notification here)
       console.log("Terms updated successfully");
     } catch (error) {
       console.error("Failed to update terms:", error);
-      // Show error message (you might want to add a toast notification here)
     }
   };
 
@@ -266,7 +261,20 @@ export default function ContentTable() {
   };
 
   const getContentMetrics = (content: any) => {
-    // Mock metrics - in a real implementation, these would come from blockchain events
+    // Use real data from contentInsights if available, otherwise fallback to mock
+    const insights = contentInsights?.popularContent.find(
+      (item) => item.tokenId === content.tokenId,
+    );
+
+    if (insights) {
+      return {
+        licenses: insights.licenseCount,
+        revenue: Number(formatEther(insights.totalRevenue)),
+        rating: 4.5, // Default rating since we don't have rating data yet
+      };
+    }
+
+    // Fallback to mock data if no insights available
     const mockLicenses = Math.floor(Math.random() * 100) + 1;
     const mockRevenue =
       Number(formatEther(content.license.price)) * mockLicenses;

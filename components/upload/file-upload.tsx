@@ -2,7 +2,6 @@
 
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
-import { useAuth, useAuthState } from "@campnetwork/origin/react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -26,12 +25,25 @@ interface FileUploadProps {
   onBack: () => void;
 }
 
-interface FileWithPreview extends File {
-  preview?: string;
+interface FileWithPreview {
+  // File properties
+  name: string;
+  size: number;
+  type: string;
+  lastModified: number;
+  webkitRelativePath: string;
+
+  // File methods
+  arrayBuffer: () => Promise<ArrayBuffer>;
+  slice: (start?: number, end?: number, contentType?: string) => Blob;
+  stream: () => ReadableStream<Uint8Array>;
+  text: () => Promise<string>;
+
+  // Custom properties
+  preview?: string | null;
   uploadProgress?: number;
   uploadError?: string;
   fileId?: string;
-  tokenId?: string;
 }
 
 const getFileIcon = (type: string | undefined) => {
@@ -52,8 +64,6 @@ export default function FileUpload({
   const [uploadedFiles, setUploadedFiles] = useState<FileWithPreview[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const { authenticated } = useAuthState();
-  const auth = useAuth();
 
   const validateFile = (file: File): string | null => {
     // File size validation (max 100MB)
@@ -102,19 +112,6 @@ export default function FileUpload({
       setUploadError(null);
       setIsUploading(true);
 
-      // Check authentication with debugging
-      console.log("Authentication check:", {
-        authenticated,
-        hasAuth: !!auth,
-        hasOrigin: !!auth?.origin,
-      });
-
-      if (!authenticated) {
-        setUploadError("Please connect your wallet first.");
-        setIsUploading(false);
-        return;
-      }
-
       // Handle rejected files
       if (rejectedFiles.length > 0) {
         const errors = rejectedFiles
@@ -157,109 +154,21 @@ export default function FileUpload({
           text: file.text.bind(file),
           // Add our custom properties
           preview,
-          uploadProgress: 0,
+          uploadProgress: 100, // Mark as ready since we're just storing locally
           fileId: `${file.name}-${file.size}-${file.lastModified}`,
-        } as FileWithPreview;
+        };
 
-        // Debug the file properties
-        console.log("File processing:", {
-          originalFile: {
-            name: file.name,
-            type: file.type,
-            size: file.size,
-            lastModified: file.lastModified,
-          },
-          processedFile: {
-            name: fileWithPreview.name,
-            type: fileWithPreview.type,
-            size: fileWithPreview.size,
-            lastModified: fileWithPreview.lastModified,
-            uploadProgress: fileWithPreview.uploadProgress,
-          },
+        console.log("File processed for local storage:", {
+          name: fileWithPreview.name,
+          type: fileWithPreview.type,
+          size: fileWithPreview.size,
         });
 
         processedFiles.push(fileWithPreview);
       }
 
-      // Add files to state first
+      // Add files to state - they're now ready for the next steps
       setUploadedFiles((prev) => [...prev, ...processedFiles]);
-
-      // Actually upload files using Origin SDK
-      for (const file of processedFiles) {
-        try {
-          if (!auth?.origin) {
-            throw new Error("Origin SDK not available");
-          }
-
-          console.log(`Starting Origin SDK upload for: ${file.name}`);
-
-          // Create metadata for the file
-          const metadata = {
-            name: file.name,
-            description: `Uploaded file: ${file.name}`,
-            contentType: file.type,
-            size: file.size,
-          };
-
-          // Create license terms (you might want to make this configurable)
-          const license = {
-            price: BigInt("100000000000000000"), // 0.1 ETH
-            duration: 365 * 24 * 60 * 60, // 1 year
-            royaltyBps: 500, // 5%
-            paymentToken: "0x0000000000000000000000000000000000000000", // ETH
-          };
-
-          // Upload with progress callback
-          const tokenId = await auth.origin.mintFile(
-            file as File,
-            metadata,
-            license,
-            undefined, // no parent
-            {
-              progressCallback: (percent: number) => {
-                console.log(`Upload progress for ${file.name}: ${percent}%`);
-                setUploadedFiles((prev) =>
-                  prev.map((f) =>
-                    f.fileId === file.fileId
-                      ? { ...f, uploadProgress: percent }
-                      : f,
-                  ),
-                );
-              },
-            },
-          );
-
-          console.log(
-            `Successfully uploaded ${file.name} with token ID: ${tokenId}`,
-          );
-
-          // Mark as completed and store token ID
-          setUploadedFiles((prev) =>
-            prev.map((f) =>
-              f.fileId === file.fileId
-                ? { ...f, uploadProgress: 100, tokenId }
-                : f,
-            ),
-          );
-        } catch (error: any) {
-          console.error(`Failed to upload ${file.name}:`, error);
-
-          // Mark as failed
-          setUploadedFiles((prev) =>
-            prev.map((f) =>
-              f.fileId === file.fileId
-                ? { ...f, uploadError: error.message, uploadProgress: 0 }
-                : f,
-            ),
-          );
-
-          setUploadError((prev) =>
-            prev
-              ? `${prev}\nFailed to upload ${file.name}: ${error.message}`
-              : `Failed to upload ${file.name}: ${error.message}`,
-          );
-        }
-      }
       setIsUploading(false);
     },
     [],
@@ -303,12 +212,9 @@ export default function FileUpload({
   };
 
   const handleNext = () => {
-    // Only pass fully uploaded files
-    const completedFiles = uploadedFiles.filter(
-      (file) => file.uploadProgress === 100,
-    );
+    // Pass all files since they're stored locally and ready
     onDataChange({
-      files: completedFiles,
+      files: uploadedFiles,
       uploadType: "file",
     });
     onNext();
@@ -362,17 +268,6 @@ export default function FileUpload({
         </Alert>
       )}
 
-      {/* Authentication Warning */}
-      {!authenticated && (
-        <Alert className="mb-6 border-orange-500/20 bg-orange-500/10">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            You need to connect your wallet to upload files. The files will be
-            stored locally until you authenticate.
-          </AlertDescription>
-        </Alert>
-      )}
-
       {/* Uploaded Files */}
       {uploadedFiles.length > 0 && (
         <div className="glass rounded-2xl p-6 mb-8">
@@ -415,42 +310,23 @@ export default function FileUpload({
                           <span className="capitalize">
                             {file.type ? file.type.split("/")[0] : "Unknown"}
                           </span>
-                          {isUploaded && (
-                            <>
-                              <span>•</span>
-                              <span className="text-green-400">Ready</span>
-                            </>
-                          )}
+                          <span>•</span>
+                          <span className="text-green-400">Ready</span>
                         </div>
                       </div>
 
                       <div className="flex items-center space-x-2 ml-4">
-                        {isUploaded ? (
-                          <>
-                            <Check className="h-4 w-4 text-green-400" />
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeFile(file.name)}
-                              className="h-6 w-6 p-0 hover:bg-red-500/20"
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </>
-                        ) : (
-                          <div className="h-4 w-4 animate-spin border-2 border-orange-500 border-t-transparent rounded-full" />
-                        )}
+                        <Check className="h-4 w-4 text-green-400" />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFile(file.name)}
+                          className="h-6 w-6 p-0 hover:bg-red-500/20"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
                       </div>
                     </div>
-
-                    {!isUploaded && (
-                      <div className="space-y-2">
-                        <Progress value={progress} className="h-2" />
-                        <p className="text-xs text-gray-400">
-                          Uploading... {Math.round(progress)}%
-                        </p>
-                      </div>
-                    )}
 
                     {file.uploadError && (
                       <p className="text-xs text-red-400 mt-2">
@@ -474,18 +350,10 @@ export default function FileUpload({
 
         <Button
           onClick={handleNext}
-          disabled={
-            uploadedFiles.length === 0 ||
-            uploadedFiles.some((file) => file.uploadProgress !== 100) ||
-            isUploading
-          }
+          disabled={uploadedFiles.length === 0 || isUploading}
           className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50"
         >
-          {isUploading
-            ? "Processing Files..."
-            : uploadedFiles.some((file) => file.uploadProgress !== 100)
-              ? "Uploading..."
-              : "Continue to Metadata"}
+          {isUploading ? "Processing Files..." : "Continue to Metadata"}
           <ArrowRight className="h-4 w-4 ml-2" />
         </Button>
       </div>

@@ -1,12 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import {
-  useAuth,
-  useAuthState,
-  useSocials,
-  useLinkSocials,
-} from "@campnetwork/origin/react";
+import { useState } from "react";
+import { useSocials, useLinkSocials } from "@campnetwork/origin/react";
+import { useRobustAuth } from "@/hooks/use-robust-auth";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
@@ -72,8 +68,7 @@ export default function SocialMint({
   onBack,
 }: SocialMintProps) {
   const { authenticated } = useAuthState();
-  const auth = useAuth();
-  const { data: linkedSocials, isLoading: socialsLoading } = useSocials();
+  const { data: linkedSocials } = useSocials();
   const {
     linkTwitter,
     linkSpotify,
@@ -191,17 +186,6 @@ export default function SocialMint({
           Link your social platforms to mint content directly from your profiles
         </p>
       </div>
-
-      {/* Authentication Warning */}
-      {!authenticated && (
-        <Alert className="mb-6 border-orange-500/20 bg-orange-500/10">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            You need to connect your wallet to link social accounts and mint
-            content.
-          </AlertDescription>
-        </Alert>
-      )}
 
       {/* Error Display */}
       {error && (

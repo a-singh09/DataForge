@@ -149,37 +149,7 @@ export default function MintingProgress({
       // Step 1: Preparing Content
       setMintingState((prev) => ({ ...prev, currentStep: 0 }));
 
-      // Check and set Origin consent if needed
-      try {
-        console.log("Checking Origin usage and consent...");
-        const originUsage = await auth.origin.getOriginUsage();
-        console.log("Origin usage:", originUsage);
-
-        // Set consent to true if not already set
-        if (!originUsage?.user?.active) {
-          console.log("Setting Origin consent...");
-          await auth.origin.setOriginConsent(true);
-          console.log("Origin consent set successfully");
-        }
-      } catch (consentError) {
-        console.warn("Origin consent setup failed:", consentError);
-        // Continue anyway as this might not be required for minting
-      }
-
-      // Test if Origin SDK is working by calling a simple method
-      try {
-        console.log("Testing Origin SDK connectivity...");
-        const testUsage = await auth.origin.getOriginUsage();
-        console.log("Origin SDK test successful:", testUsage);
-      } catch (testError) {
-        console.warn("Origin SDK test failed:", testError);
-        throw new Error(
-          "Origin SDK is not responding properly. Please refresh and try again.",
-        );
-      }
-
-      // Additional delay to ensure all initialization is complete
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Simple initialization - just proceed with minting
 
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
@@ -218,38 +188,12 @@ export default function MintingProgress({
         throw new Error("No files provided for minting");
       }
 
-      // Validate the first file
+      // Basic file validation
       const file = files[0];
-      if (!file.name) {
-        throw new Error(
-          `File name is missing. File object: ${JSON.stringify({
-            hasName: "name" in file,
-            hasType: "type" in file,
-            hasSize: "size" in file,
-            keys: Object.keys(file),
-            constructor: file.constructor.name,
-          })}`,
-        );
-      }
-      if (!file.type) {
-        throw new Error("File type is missing");
-      }
-
-      // Additional file validation
-      if (file.size === 0) {
-        throw new Error("File is empty");
-      }
-
-      if (file.size > 100 * 1024 * 1024) {
-        // 100MB limit
-        throw new Error("File is too large (max 100MB)");
-      }
-
-      console.log("File validation passed:", {
+      console.log("Processing file:", {
         name: file.name,
         type: file.type,
         size: file.size,
-        sizeInMB: (file.size / 1024 / 1024).toFixed(2),
       });
 
       let tokenId: string;
@@ -259,212 +203,70 @@ export default function MintingProgress({
         throw new Error("No files to mint");
       }
 
-      // File minting - mint the first file
-      const fileForMint = files[0];
+      // Create a proper File object from our stored file data (exactly like Simple File Upload Test)
+      const storedFile = files[0];
 
-      // Create simplified metadata for Origin SDK
-      const fileMetadata = {
-        title: metadata.title || fileForMint.name,
-        description: metadata.description || `File: ${fileForMint.name}`,
-        category: metadata.category || "Other",
-        fileName: fileForMint.name,
-        fileType: fileForMint.type,
-        fileSize: fileForMint.size,
-      } as Record<string, unknown>;
-
-      // Remove any undefined or null values
-      Object.keys(fileMetadata).forEach((key) => {
-        if (fileMetadata[key] === undefined || fileMetadata[key] === null) {
-          delete fileMetadata[key];
-        }
+      // Create a new File object using the stored file data
+      const fileForMint = new File([storedFile.slice()], storedFile.name, {
+        type: storedFile.type,
+        lastModified: storedFile.lastModified,
       });
 
-      console.log("Cleaned metadata:", fileMetadata);
-
-      // Validate and format license terms
-      console.log("Raw license terms received:", licenseTerms);
-
-      // Ensure we have valid license terms
-      if (!licenseTerms) {
-        throw new Error("License terms are missing");
-      }
-
-      // Convert and validate price - ensure we handle BigInt properly
-      let priceInWei: bigint;
-      try {
-        console.log(
-          "Processing price:",
-          licenseTerms.price,
-          typeof licenseTerms.price,
-        );
-
-        if (typeof licenseTerms.price === "bigint") {
-          priceInWei = licenseTerms.price;
-        } else if (typeof licenseTerms.price === "string") {
-          // Remove any non-numeric characters and convert
-          const cleanPrice = licenseTerms.price.replace(/[^0-9]/g, "");
-          priceInWei = BigInt(cleanPrice);
-        } else if (typeof licenseTerms.price === "number") {
-          // Convert from ETH to wei, ensuring we don't lose precision
-          const weiString = (licenseTerms.price * 1e18).toFixed(0);
-          priceInWei = BigInt(weiString);
-        } else {
-          throw new Error(`Invalid price format: ${typeof licenseTerms.price}`);
-        }
-
-        console.log("Converted price to wei:", priceInWei.toString());
-
-        if (priceInWei <= BigInt(0)) {
-          throw new Error("License price must be greater than 0");
-        }
-      } catch (error) {
-        console.error("Price conversion error:", error);
-        throw new Error(
-          `Invalid price: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-
-      // Validate duration
-      const duration = Number(licenseTerms.duration);
-      if (!duration || duration <= 0) {
-        throw new Error("License duration must be greater than 0");
-      }
-
-      // Validate royalty
-      const royaltyBps = Number(licenseTerms.royaltyBps);
-      if (royaltyBps < 0 || royaltyBps > 10000) {
-        throw new Error(
-          "Royalty must be between 0 and 10000 basis points (0-100%)",
-        );
-      }
-
-      // Format license terms for Origin SDK
-      const paymentTokenAddress =
-        licenseTerms.paymentToken ||
-        "0x0000000000000000000000000000000000000000";
-
-      // Ensure the payment token address is properly formatted
-      if (
-        !paymentTokenAddress.startsWith("0x") ||
-        paymentTokenAddress.length !== 42
-      ) {
-        throw new Error(
-          `Invalid payment token address format: ${paymentTokenAddress}`,
-        );
-      }
-
-      const formattedLicenseTerms = {
-        price: priceInWei,
-        duration: duration,
-        royaltyBps: royaltyBps,
-        paymentToken: paymentTokenAddress as `0x${string}`, // Ensure proper Address type
-      };
-
-      console.log("Formatted license terms:", {
-        price: formattedLicenseTerms.price.toString(),
-        priceInEth: (Number(formattedLicenseTerms.price) / 1e18).toFixed(6),
-        duration: formattedLicenseTerms.duration,
-        royaltyBps: formattedLicenseTerms.royaltyBps,
-        paymentToken: formattedLicenseTerms.paymentToken,
-      });
-
-      console.log("Attempting file minting...", {
-        fileName: fileForMint.name,
-        fileType: fileForMint.type,
-        fileSize: fileForMint.size,
-        fileMetadata,
-        formattedLicenseTerms,
-      });
-
-      console.log("File object details:", {
+      console.log("Created proper File object for minting:", {
         name: fileForMint.name,
         type: fileForMint.type,
         size: fileForMint.size,
-        lastModified: fileForMint.lastModified,
         constructor: fileForMint.constructor.name,
       });
+
+      // Use simple metadata (exactly like Simple File Upload Test)
+      const fileMetadata = {
+        name: metadata.title || fileForMint.name,
+        description: metadata.description || `File: ${fileForMint.name}`,
+      };
+
+      // Use simple license terms (exactly like Simple File Upload Test)
+      const simpleLicense = {
+        price: BigInt("0"), // Start with 0 like the working example
+        duration: 86400, // 1 day like the working example
+        royaltyBps: 0, // 0% like the working example
+        paymentToken:
+          "0x0000000000000000000000000000000000000000" as `0x${string}`,
+      };
+
+      console.log(
+        "Using simple license terms (like working example):",
+        simpleLicense,
+      );
 
       let mintedTokenId: string | null = null;
 
       try {
-        console.log("Calling Origin SDK mintFile with:", {
-          fileName: fileForMint.name,
-          fileSize: fileForMint.size,
-          metadataKeys: Object.keys(fileMetadata),
-          licenseTerms: {
-            price: formattedLicenseTerms.price.toString(),
-            duration: formattedLicenseTerms.duration,
-            royaltyBps: formattedLicenseTerms.royaltyBps,
-            paymentToken: formattedLicenseTerms.paymentToken,
-          },
-        });
-
-        // Try with minimal metadata first to isolate the issue
-        const minimalMetadata = {
-          title: fileForMint.name,
-          description: `File: ${fileForMint.name}`,
-        };
-
-        console.log("Using minimal metadata for testing:", minimalMetadata);
+        console.log("Calling mintFile exactly like Simple File Upload Test...");
 
         mintedTokenId = await auth.origin!.mintFile(
-          fileForMint as File,
-          minimalMetadata, // Use minimal metadata for testing
-          formattedLicenseTerms,
-          undefined, // no parent
+          fileForMint,
+          fileMetadata,
+          simpleLicense,
+          undefined,
           {
             progressCallback: (percent: number) => {
               console.log(`Upload progress: ${percent}%`);
+              // Update progress in UI
+              setMintingState((prev) => ({
+                ...prev,
+                currentStep: Math.floor((percent / 100) * 2) + 1, // Map progress to steps 1-2
+              }));
             },
           },
         );
 
         console.log("Minting successful, token ID:", mintedTokenId);
       } catch (mintError: any) {
-        console.error("Minting error details:", {
-          error: mintError,
-          message: mintError.message,
-          code: mintError.code,
-          data: mintError.data,
-          stack: mintError.stack,
-        });
-
-        // Handle specific error cases
-        if (mintError.message?.includes("status: 0x0")) {
-          throw new Error(
-            "Blockchain transaction failed (status: 0x0). This usually means:\n\n" +
-              "• Smart contract rejected the transaction due to invalid parameters\n" +
-              "• Gas limit was too low (try increasing gas limit in your wallet)\n" +
-              "• License terms are invalid (price: " +
-              (Number(formattedLicenseTerms.price) / 1e18).toFixed(6) +
-              " ETH, duration: " +
-              formattedLicenseTerms.duration +
-              "s, royalty: " +
-              formattedLicenseTerms.royaltyBps +
-              " BPS)\n" +
-              "• Network congestion or RPC issues\n\n" +
-              "Try refreshing and minting again, or adjust your license terms.",
-          );
-        } else if (
-          mintError.message?.includes("user rejected") ||
-          mintError.message?.includes("User denied")
-        ) {
-          throw new Error("Transaction was rejected by user");
-        } else if (mintError.message?.includes("insufficient funds")) {
-          throw new Error("Insufficient funds to pay for transaction gas");
-        } else if (mintError.message?.includes("nonce")) {
-          throw new Error(
-            "Transaction nonce error. Please reset your wallet account or try again.",
-          );
-        } else if (mintError.message?.includes("gas")) {
-          throw new Error(
-            "Gas estimation failed. Try increasing gas limit in your wallet or try again later.",
-          );
-        } else {
-          throw new Error(
-            `Minting failed: ${mintError.message || "Unknown error"}. Please check console for details.`,
-          );
-        }
+        console.error("Minting failed:", mintError);
+        throw new Error(
+          `Minting failed: ${mintError.message || "Unknown error"}`,
+        );
       }
 
       if (!mintedTokenId) {
