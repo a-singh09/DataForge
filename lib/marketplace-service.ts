@@ -180,6 +180,12 @@ export class MarketplaceService {
           BigInt(
             "27885520041093658585303584173082111687028681907098281542498800404897098505874",
           ),
+          BigInt(
+            "16123578725866424640949239869761840056031657569608134149270542052425099947370",
+          ),
+          BigInt(
+            "36231100099188324529916239534553491533774005220845670696203766892628609116715",
+          ),
         ];
 
         // Fetch known tokens in batches
@@ -349,6 +355,29 @@ export class MarketplaceService {
     } catch (error) {
       console.error("Failed to fetch trending data:", error);
       return [];
+    }
+  }
+
+  /**
+   * Download dataset content using Origin SDK getData method
+   */
+  async downloadDataset(tokenId: bigint): Promise<any> {
+    try {
+      if (!this.auth.origin) {
+        throw new Error("Origin SDK not available");
+      }
+
+      console.log(`Downloading dataset for token ${tokenId}`);
+      const data = await this.auth.origin.getData(tokenId);
+
+      if (!data) {
+        throw new Error("No data returned from Origin SDK");
+      }
+
+      return data;
+    } catch (error) {
+      console.error(`Failed to download dataset for token ${tokenId}:`, error);
+      throw error;
     }
   }
 

@@ -31,6 +31,7 @@ interface FileWithPreview extends File {
   uploadProgress?: number;
   uploadError?: string;
   fileId?: string;
+  tokenId?: string;
 }
 
 const getFileIcon = (type: string | undefined) => {
@@ -101,6 +102,19 @@ export default function FileUpload({
       setUploadError(null);
       setIsUploading(true);
 
+      // Check authentication with debugging
+      console.log("Authentication check:", {
+        authenticated,
+        hasAuth: !!auth,
+        hasOrigin: !!auth?.origin,
+      });
+
+      if (!authenticated) {
+        setUploadError("Please connect your wallet first.");
+        setIsUploading(false);
+        return;
+      }
+
       // Handle rejected files
       if (rejectedFiles.length > 0) {
         const errors = rejectedFiles
@@ -170,35 +184,82 @@ export default function FileUpload({
       // Add files to state first
       setUploadedFiles((prev) => [...prev, ...processedFiles]);
 
-      // Then simulate upload progress for each file
-      processedFiles.forEach((file, index) => {
-        let progress = 0;
-        const interval = setInterval(
-          () => {
-            progress += Math.random() * 25 + 5; // 5-30% increments
-            if (progress >= 100) {
-              progress = 100;
-              clearInterval(interval);
-            }
+      // Actually upload files using Origin SDK
+      for (const file of processedFiles) {
+        try {
+          if (!auth?.origin) {
+            throw new Error("Origin SDK not available");
+          }
 
-            // Update file progress using unique file ID
-            setUploadedFiles((prev) => {
-              console.log(`Updating progress for ${file.name}: ${progress}%`);
-              const updated = prev.map((f) => {
-                if (f.fileId === file.fileId) {
-                  console.log(
-                    `Found matching file by ID, updating progress to ${progress}%`,
-                  );
-                  return { ...f, uploadProgress: progress } as FileWithPreview;
-                }
-                return f;
-              });
-              return updated;
-            });
-          },
-          150 + index * 50,
-        ); // Stagger the uploads slightly
-      });
+          console.log(`Starting Origin SDK upload for: ${file.name}`);
+
+          // Create metadata for the file
+          const metadata = {
+            name: file.name,
+            description: `Uploaded file: ${file.name}`,
+            contentType: file.type,
+            size: file.size,
+          };
+
+          // Create license terms (you might want to make this configurable)
+          const license = {
+            price: BigInt("100000000000000000"), // 0.1 ETH
+            duration: 365 * 24 * 60 * 60, // 1 year
+            royaltyBps: 500, // 5%
+            paymentToken: "0x0000000000000000000000000000000000000000", // ETH
+          };
+
+          // Upload with progress callback
+          const tokenId = await auth.origin.mintFile(
+            file as File,
+            metadata,
+            license,
+            undefined, // no parent
+            {
+              progressCallback: (percent: number) => {
+                console.log(`Upload progress for ${file.name}: ${percent}%`);
+                setUploadedFiles((prev) =>
+                  prev.map((f) =>
+                    f.fileId === file.fileId
+                      ? { ...f, uploadProgress: percent }
+                      : f,
+                  ),
+                );
+              },
+            },
+          );
+
+          console.log(
+            `Successfully uploaded ${file.name} with token ID: ${tokenId}`,
+          );
+
+          // Mark as completed and store token ID
+          setUploadedFiles((prev) =>
+            prev.map((f) =>
+              f.fileId === file.fileId
+                ? { ...f, uploadProgress: 100, tokenId }
+                : f,
+            ),
+          );
+        } catch (error: any) {
+          console.error(`Failed to upload ${file.name}:`, error);
+
+          // Mark as failed
+          setUploadedFiles((prev) =>
+            prev.map((f) =>
+              f.fileId === file.fileId
+                ? { ...f, uploadError: error.message, uploadProgress: 0 }
+                : f,
+            ),
+          );
+
+          setUploadError((prev) =>
+            prev
+              ? `${prev}\nFailed to upload ${file.name}: ${error.message}`
+              : `Failed to upload ${file.name}: ${error.message}`,
+          );
+        }
+      }
       setIsUploading(false);
     },
     [],

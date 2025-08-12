@@ -149,7 +149,7 @@ export default function DatasetAccess({
   };
 
   /**
-   * Download dataset directly (no access token needed)
+   * Download dataset using Origin SDK getData method
    */
   const downloadDataset = async () => {
     if (!licenseStatus?.hasAccess) {
@@ -161,98 +161,68 @@ export default function DatasetAccess({
       return;
     }
 
+    if (!origin) {
+      toast({
+        title: "Download Failed",
+        description: "Origin SDK not available.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsDownloading(true);
 
     try {
-      // Get the actual content URL with multiple IPFS gateway fallbacks
-      let contentUrl = "";
-      let fileName = "";
-      let mimeType = "application/octet-stream";
+      toast({
+        title: "Download Started",
+        description: `Fetching ${dataset.title} using Origin SDK...`,
+      });
 
-      // List of IPFS gateways to try (in order of preference)
-      const ipfsGateways = [
-        "https://gateway.pinata.cloud/ipfs/",
-        "https://cloudflare-ipfs.com/ipfs/",
-        "https://ipfs.io/ipfs/",
-        "https://dweb.link/ipfs/",
-        "https://gateway.ipfs.io/ipfs/",
-      ];
+      console.log(`Getting data for token ${dataset.tokenId}`);
 
-      let contentHash = "";
+      // Use Origin SDK's getData method to fetch the actual file content
+      const tokenData = await origin.getData(dataset.tokenId);
+      console.log("Token data received:", tokenData);
 
-      // Get content hash from various sources
-      if (dataset.contentHash) {
-        contentHash = dataset.contentHash.startsWith("ipfs://")
-          ? dataset.contentHash.replace("ipfs://", "")
-          : dataset.contentHash;
-      } else if (dataset.uri) {
-        contentHash = dataset.uri.startsWith("ipfs://")
-          ? dataset.uri.replace("ipfs://", "")
-          : dataset.uri.startsWith("http")
-            ? dataset.uri
-            : dataset.uri;
+      if (!tokenData) {
+        throw new Error("No data returned from Origin SDK");
       }
 
-      // If we have a content hash, construct URLs with different gateways
-      if (
-        contentHash &&
-        (contentHash.startsWith("Qm") || contentHash.startsWith("bafy"))
-      ) {
-        contentUrl = ipfsGateways[0] + contentHash; // Start with the first gateway
-      } else if (contentHash.startsWith("http")) {
-        contentUrl = contentHash; // Already a full URL
+      // Check if the response contains file URLs (AWS S3 signed URLs)
+      // Handle the structure: { isError: false, data: [{ file: ['url'] }], message: '' }
+      let fileUrls: string[] = [];
+
+      if (tokenData && typeof tokenData === "object") {
+        // Check for the new structure with data array
+        if (tokenData.data && Array.isArray(tokenData.data)) {
+          for (const item of tokenData.data) {
+            if (item.file && Array.isArray(item.file)) {
+              fileUrls.push(...item.file);
+            }
+          }
+        }
+        // Also check for the old direct structure as fallback
+        else if (tokenData.file && Array.isArray(tokenData.file)) {
+          fileUrls = tokenData.file;
+        }
       }
 
-      // Determine file extension and MIME type based on content type
-      switch (dataset.contentType) {
-        case "image":
-          fileName = `${dataset.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_dataset.jpg`;
-          mimeType = "image/jpeg";
-          break;
-        case "audio":
-          fileName = `${dataset.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_dataset.mp3`;
-          mimeType = "audio/mpeg";
-          break;
-        case "video":
-          fileName = `${dataset.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_dataset.mp4`;
-          mimeType = "video/mp4";
-          break;
-        case "code":
-          fileName = `${dataset.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_dataset.json`;
-          mimeType = "application/json";
-          break;
-        case "social":
-        case "text":
-        default:
-          fileName = `${dataset.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_dataset.txt`;
-          mimeType = "text/plain";
-          break;
-      }
+      if (fileUrls.length > 0) {
+        console.log("Found file URLs in response:", fileUrls);
 
-      if (contentUrl) {
-        toast({
-          title: "Download Started",
-          description: `Fetching ${dataset.title} from IPFS...`,
-        });
+        // Try to fetch the actual file content from the URLs
+        for (let i = 0; i < fileUrls.length; i++) {
+          const fileUrl = fileUrls[i];
 
-        let success = false;
-        let lastError = null;
-
-        // Try multiple IPFS gateways if the first one fails
-        for (let i = 0; i < ipfsGateways.length && !success; i++) {
           try {
-            const gatewayUrl = contentHash.startsWith("http")
-              ? contentUrl
-              : ipfsGateways[i] + contentHash;
+            console.log(`Fetching file ${i + 1}: ${fileUrl}`);
 
-            console.log(
-              `Trying gateway ${i + 1}/${ipfsGateways.length}: ${gatewayUrl}`,
-            );
-
-            const response = await fetch(gatewayUrl, {
+            // Try to fetch the actual file content with proper headers
+            const response = await fetch(fileUrl, {
               method: "GET",
               headers: {
                 Accept: "*/*",
+                "Cache-Control": "no-cache",
               },
             });
 
@@ -262,71 +232,179 @@ export default function DatasetAccess({
               );
             }
 
-            // Get the content as blob
-            const contentBlob = await response.blob();
+            // Check the content type
+            const contentType =
+              response.headers.get("content-type") ||
+              "application/octet-stream";
+            console.log(`File ${i + 1} content type:`, contentType);
 
-            // Use the actual content type from the response if available
-            let actualMimeType =
-              response.headers.get("content-type") || mimeType;
+            // Get the content as text first to see what we're getting
+            const content = await response.text();
+            console.log(
+              `File ${i + 1} content preview:`,
+              content.substring(0, 200),
+            );
 
-            // If we got a generic content type, try to infer from the blob type
-            if (
-              actualMimeType === "application/octet-stream" ||
-              actualMimeType === "text/plain"
-            ) {
-              actualMimeType = contentBlob.type || mimeType;
+            // Try to determine if this is JSON metadata or actual file content
+            let isMetadata = false;
+            try {
+              const parsed = JSON.parse(content);
+              if (parsed.name && parsed.size && parsed.type) {
+                isMetadata = true;
+                console.log(`File ${i + 1} appears to be metadata:`, parsed);
+              }
+            } catch (e) {
+              // Not JSON, probably actual file content
             }
 
-            // Update filename extension based on actual content type
-            if (actualMimeType.startsWith("image/")) {
-              const ext = actualMimeType.split("/")[1] || "jpg";
-              fileName = fileName.replace(/\.[^.]+$/, `.${ext}`);
-            } else if (actualMimeType.startsWith("audio/")) {
-              const ext = actualMimeType.split("/")[1] || "mp3";
-              fileName = fileName.replace(/\.[^.]+$/, `.${ext}`);
-            } else if (actualMimeType.startsWith("video/")) {
-              const ext = actualMimeType.split("/")[1] || "mp4";
-              fileName = fileName.replace(/\.[^.]+$/, `.${ext}`);
-            } else if (actualMimeType === "application/json") {
-              fileName = fileName.replace(/\.[^.]+$/, ".json");
+            if (isMetadata) {
+              toast({
+                title: "Metadata Detected",
+                description: `File ${i + 1} returned metadata instead of content. This might be a URL configuration issue.`,
+                variant: "destructive",
+              });
+              continue;
             }
 
-            // Create a new blob with the correct MIME type
-            const blob = new Blob([contentBlob], { type: actualMimeType });
+            // Create blob and download
+            const blob = new Blob([content], { type: contentType });
+
+            // Try to extract filename from URL or use default
+            let fileName = `dataset_file_${i + 1}`;
+            try {
+              const urlObj = new URL(fileUrl);
+              const pathParts = urlObj.pathname.split("/");
+              const urlFileName = pathParts[pathParts.length - 1];
+              if (urlFileName && !urlFileName.includes("?")) {
+                fileName = urlFileName;
+              }
+            } catch (urlError) {
+              console.warn("Could not extract filename from URL:", urlError);
+            }
+
+            // Add appropriate extension if missing
+            if (!fileName.includes(".")) {
+              if (contentType.includes("text")) {
+                fileName += ".txt";
+              } else if (contentType.includes("json")) {
+                fileName += ".json";
+              } else {
+                fileName += ".bin";
+              }
+            }
 
             // Trigger download
-            const url = URL.createObjectURL(blob);
+            const downloadUrl = URL.createObjectURL(blob);
             const a = document.createElement("a");
-            a.href = url;
+            a.href = downloadUrl;
             a.download = fileName;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            URL.revokeObjectURL(downloadUrl);
 
-            toast({
-              title: "Download Complete",
-              description: `Successfully downloaded ${dataset.title}`,
-            });
+            console.log(`Successfully downloaded file ${i + 1}: ${fileName}`);
 
-            success = true;
-          } catch (error: any) {
-            console.warn(`Gateway ${i + 1} failed:`, error.message);
-            lastError = error;
+            // Small delay between downloads
+            if (i < fileUrls.length - 1) {
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
+          } catch (fileError) {
+            console.error(`Failed to download file ${i + 1}:`, fileError);
 
-            // If this isn't the last gateway, continue to the next one
-            if (i < ipfsGateways.length - 1) {
-              continue;
+            // Fallback: try opening in new tab
+            try {
+              console.log(`Fallback: Opening file ${i + 1} in new tab`);
+              window.open(fileUrl, "_blank");
+            } catch (fallbackError) {
+              toast({
+                title: "Download Failed",
+                description: `Failed to download file ${i + 1}: ${fileError.message}`,
+                variant: "destructive",
+              });
             }
           }
         }
 
-        // If all gateways failed, throw the last error
-        if (!success && lastError) {
-          throw lastError;
-        }
+        toast({
+          title: "Download Started",
+          description: `Opened ${fileUrls.length} file(s) from ${dataset.title} in new tabs`,
+        });
+        return;
+      }
+
+      // Fallback: Handle other data formats (original logic)
+      let fileName = `${dataset.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_dataset`;
+      let mimeType = "application/octet-stream";
+
+      // Set file extension and MIME type based on content type
+      switch (dataset.contentType) {
+        case "image":
+          fileName += ".jpg";
+          mimeType = "image/jpeg";
+          break;
+        case "audio":
+          fileName += ".mp3";
+          mimeType = "audio/mpeg";
+          break;
+        case "video":
+          fileName += ".mp4";
+          mimeType = "video/mp4";
+          break;
+        case "code":
+          fileName += ".json";
+          mimeType = "application/json";
+          break;
+        case "social":
+        case "text":
+        default:
+          fileName += ".txt";
+          mimeType = "text/plain";
+          break;
+      }
+
+      let blob: Blob;
+
+      // Handle different data formats that might be returned
+      if (tokenData instanceof Blob) {
+        // Data is already a blob
+        blob = tokenData;
+      } else if (tokenData instanceof ArrayBuffer) {
+        // Data is an ArrayBuffer
+        blob = new Blob([tokenData], { type: mimeType });
+      } else if (typeof tokenData === "string") {
+        // Data is a string (JSON, text, etc.)
+        blob = new Blob([tokenData], { type: mimeType });
+      } else if (tokenData && typeof tokenData === "object") {
+        // Data is an object, stringify it
+        const jsonString = JSON.stringify(tokenData, null, 2);
+        blob = new Blob([jsonString], { type: "application/json" });
+        fileName = fileName.replace(/\.[^.]+$/, ".json");
       } else {
-        // Fallback: create a metadata file if no content URL is available
+        throw new Error("Unsupported data format received from Origin SDK");
+      }
+
+      // Trigger download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Download Complete",
+        description: `Successfully downloaded ${dataset.title}`,
+      });
+    } catch (error: any) {
+      console.error("Download failed:", error);
+
+      // Fallback: create a metadata file if the actual content can't be downloaded
+      try {
+        console.log("Falling back to metadata download");
+
         const metadataContent = JSON.stringify(
           {
             title: dataset.title,
@@ -341,6 +419,8 @@ export default function DatasetAccess({
             tags: dataset.tags,
             samples: dataset.samples,
             downloadedAt: new Date().toISOString(),
+            note: "This is metadata only. The actual dataset content could not be retrieved.",
+            error: error.message,
           },
           null,
           2,
@@ -359,17 +439,16 @@ export default function DatasetAccess({
         toast({
           title: "Metadata Downloaded",
           description:
-            "Content not directly accessible. Downloaded metadata instead.",
+            "Could not access dataset content. Downloaded metadata with error details.",
           variant: "default",
         });
+      } catch (fallbackError) {
+        toast({
+          title: "Download Failed",
+          description: error.message || "Failed to download dataset.",
+          variant: "destructive",
+        });
       }
-    } catch (error: any) {
-      console.error("Download failed:", error);
-      toast({
-        title: "Download Failed",
-        description: error.message || "Failed to download dataset.",
-        variant: "destructive",
-      });
     } finally {
       setIsDownloading(false);
     }
