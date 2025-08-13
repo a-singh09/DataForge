@@ -170,6 +170,9 @@ export class MarketplaceService {
           BigInt(
             "12534741325465616854350916263157304197844422456562906124763996735273631680500",
           ),
+          BigInt(
+            "97812403694419289483317826245817224897826619463759423455484352658636403681058",
+          ),
         ];
 
         // Fetch known tokens sequentially to avoid overwhelming the RPC

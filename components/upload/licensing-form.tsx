@@ -43,14 +43,9 @@ const paymentTokens = [
 ];
 
 const licenseDurations = [
+  { value: 1 * 24 * 60 * 60, label: "1 Day", displayValue: "1" },
+  { value: 2 * 24 * 60 * 60, label: "2 Days", displayValue: "2" },
   { value: 30 * 24 * 60 * 60, label: "30 Days", displayValue: "30" },
-  { value: 90 * 24 * 60 * 60, label: "90 Days", displayValue: "90" },
-  { value: 365 * 24 * 60 * 60, label: "1 Year", displayValue: "365" },
-  {
-    value: 10 * 365 * 24 * 60 * 60,
-    label: "10 Years",
-    displayValue: "lifetime",
-  },
 ];
 
 export default function LicensingForm({

@@ -288,7 +288,7 @@ export default function DatasetMetadata({ dataset }: DatasetMetadataProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-2">
+            {/* <div className="flex flex-wrap gap-2">
               {dataset.tags.map((tag) => (
                 <Badge
                   key={tag}
@@ -298,7 +298,7 @@ export default function DatasetMetadata({ dataset }: DatasetMetadataProps) {
                   #{tag}
                 </Badge>
               ))}
-            </div>
+            </div> */}
           </CardContent>
         </Card>
       )}

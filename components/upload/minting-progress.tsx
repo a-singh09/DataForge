@@ -167,6 +167,19 @@ export default function MintingProgress({
         uploadType: data.uploadType,
       });
 
+      // Debug the specific data we'll use
+      console.log("Form data breakdown:", {
+        title: metadata.title,
+        description: metadata.description,
+        category: metadata.category,
+        tags: metadata.tags,
+        price: licenseTerms.price,
+        priceType: typeof licenseTerms.price,
+        duration: licenseTerms.duration,
+        royaltyBps: licenseTerms.royaltyBps,
+        paymentToken: licenseTerms.paymentToken,
+      });
+
       // Debug the files array
       console.log("Files array details:", files);
       if (files.length > 0) {
@@ -219,35 +232,66 @@ export default function MintingProgress({
         constructor: fileForMint.constructor.name,
       });
 
-      // Use simple metadata (exactly like Simple File Upload Test)
+      // Use metadata from the form
       const fileMetadata = {
         name: metadata.title || fileForMint.name,
         description: metadata.description || `File: ${fileForMint.name}`,
+        // Add additional metadata fields if they exist
+        ...(metadata.category && { category: metadata.category }),
+        ...(metadata.tags &&
+          metadata.tags.length > 0 && { tags: metadata.tags.join(", ") }),
       };
 
-      // Use simple license terms (exactly like Simple File Upload Test)
-      const simpleLicense = {
-        price: BigInt("0"), // Start with 0 like the working example
-        duration: 86400, // 1 day like the working example
-        royaltyBps: 0, // 0% like the working example
-        paymentToken:
-          "0x0000000000000000000000000000000000000000" as `0x${string}`,
+      console.log("Using metadata from form:", fileMetadata);
+
+      // const simpleLicense = {
+      //   price: BigInt("10000000000000000"), // Start with 0 like the working example
+      //   duration: 86400, // 1 day like the working example
+      //   royaltyBps: 9500, // 0% like the working example
+      //   paymentToken:
+      //     "0x0000000000000000000000000000000000000000" as `0x${string}`,
+      // };
+
+      // Use license terms from the form (but ensure they're properly formatted)
+      const formLicense = {
+        price:
+          typeof licenseTerms.price === "string"
+            ? BigInt(licenseTerms.price)
+            : licenseTerms.price || BigInt("0"), // Convert string to BigInt
+        duration: licenseTerms.duration || 86400, // Use form duration or fallback to 1 day
+        royaltyBps: licenseTerms.royaltyBps || 0, // Use form royalty or fallback to 0
+        paymentToken: "0x0000000000000000000000000000000000000000" as `0x${string}`,
       };
 
-      console.log(
-        "Using simple license terms (like working example):",
-        simpleLicense,
-      );
+      console.log("Raw license terms from form:", licenseTerms);
+      console.log("Converted license terms for minting:", {
+        price: formLicense.price.toString(),
+        priceType: typeof formLicense.price,
+        priceInEth: (Number(formLicense.price) / 1e18).toFixed(6),
+        duration: formLicense.duration,
+        durationInDays: Math.floor(formLicense.duration / 86400),
+        royaltyBps: formLicense.royaltyBps,
+        royaltyPercent: (formLicense.royaltyBps / 100).toFixed(2),
+        paymentToken: formLicense.paymentToken,
+      });
 
       let mintedTokenId: string | null = null;
 
       try {
-        console.log("Calling mintFile exactly like Simple File Upload Test...");
+        console.log("Calling mintFile with these exact parameters:");
+        console.log("File:", {
+          name: fileForMint.name,
+          size: fileForMint.size,
+          type: fileForMint.type,
+        });
+        console.log("Metadata:", fileMetadata);
+        console.log("License:", formLicense);
+        console.log("License price type:", typeof formLicense.price);
 
         mintedTokenId = await auth.origin!.mintFile(
           fileForMint,
           fileMetadata,
-          simpleLicense,
+          formLicense,
           undefined,
           {
             progressCallback: (percent: number) => {

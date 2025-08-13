@@ -269,16 +269,16 @@ export default function DatasetCard({ dataset, viewMode }: DatasetCardProps) {
           {dataset.description}
         </p>
 
-        <div className="flex flex-wrap gap-2 mb-4">
-          {dataset.tags.slice(0, 3).map((tag) => (
+        {/* <div className="flex flex-wrap gap-2 mb-4">
+          {dataset.tags?.slice(0, 3).map((tag) => (
             <span
               key={tag}
               className="text-xs px-2 py-1 bg-gray-800 rounded-full text-gray-300"
             >
               #{tag}
             </span>
-          ))}
-        </div>
+          )) || []}
+        </div> */}
 
         <div className="flex items-center justify-between text-sm text-gray-400">
           <div className="flex items-center gap-4">

@@ -209,7 +209,7 @@ export default function DatasetPreview({
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-wrap gap-2">
+                {/* <div className="flex flex-wrap gap-2">
                   {dataset.tags.map((tag) => (
                     <span
                       key={tag}
@@ -218,7 +218,7 @@ export default function DatasetPreview({
                       #{tag}
                     </span>
                   ))}
-                </div>
+                </div> */}
               </CardContent>
             </Card>
           )}
