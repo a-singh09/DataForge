@@ -260,7 +260,8 @@ export default function MintingProgress({
             : licenseTerms.price || BigInt("0"), // Convert string to BigInt
         duration: licenseTerms.duration || 86400, // Use form duration or fallback to 1 day
         royaltyBps: licenseTerms.royaltyBps || 0, // Use form royalty or fallback to 0
-        paymentToken: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+        paymentToken:
+          "0x0000000000000000000000000000000000000000" as `0x${string}`,
       };
 
       console.log("Raw license terms from form:", licenseTerms);
@@ -318,6 +319,33 @@ export default function MintingProgress({
       }
 
       tokenId = mintedTokenId;
+
+      // Store the token ID in database
+      try {
+        console.log("Storing token ID in database:", tokenId);
+        const storeResponse = await fetch("/api/tokenids", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            tokenId: tokenId,
+          }),
+        });
+
+        const responseText = await storeResponse.text();
+        console.log("Store response status:", storeResponse.status);
+        console.log("Store response text:", responseText);
+
+        if (storeResponse.ok) {
+          console.log("Token ID stored successfully in database");
+        } else {
+          console.warn("Failed to store token ID in database:", responseText);
+        }
+      } catch (storeError) {
+        console.warn("Error storing token ID in database:", storeError);
+        // Don't fail the minting process if database storage fails
+      }
 
       // Step 3: Minting IpNFT (blockchain transaction)
       setMintingState((prev) => ({ ...prev, currentStep: 2, tokenId }));
@@ -570,12 +598,17 @@ export default function MintingProgress({
               </p>
             </div>
 
-            <div className="bg-gray-800/50 rounded-xl p-6">
+            <div className="bg-gray-800/50 rounded-xl p-6 text-center">
               <h3 className="font-semibold mb-2">IpNFT Details</h3>
               <p className="text-gray-400 text-sm mb-2">Token ID:</p>
-              <div className="flex items-center space-x-2">
-                <p className="text-blue-400 font-mono text-xs">
-                  {mintingState.tokenId || "N/A"}
+              <div className="flex items-center justify-center space-x-2">
+                <p
+                  className="text-blue-400 font-mono text-xs truncate max-w-[200px]"
+                  title={mintingState.tokenId || "N/A"}
+                >
+                  {mintingState.tokenId
+                    ? `${mintingState.tokenId.slice(0, 8)}...${mintingState.tokenId.slice(-8)}`
+                    : "N/A"}
                 </p>
                 {mintingState.tokenId && (
                   <Button
@@ -584,7 +617,8 @@ export default function MintingProgress({
                     onClick={() =>
                       navigator.clipboard.writeText(mintingState.tokenId!)
                     }
-                    className="h-6 w-6 p-0"
+                    className="h-6 w-6 p-0 flex-shrink-0"
+                    title="Copy full token ID"
                   >
                     <Copy className="h-3 w-3" />
                   </Button>

@@ -154,29 +154,35 @@ export class MarketplaceService {
         const allIpNFTs: IpNFTMetadata[] = [];
 
         // Known token IDs to fetch (these are the actual marketplace items)
-        const knownTokenIds = [
-          BigInt(
-            "7235602763579303523229090887911893772021989063542858376305575221240366367542",
-          ),
-          BigInt(
-            "27885520041093658585303584173082111687028681907098281542498800404897098505874",
-          ),
-          BigInt(
-            "16123578725866424640949239869761840056031657569608134149270542052425099947370",
-          ),
-          BigInt(
-            "36231100099188324529916239534553491533774005220845670696203766892628609116715",
-          ),
-          BigInt(
-            "12534741325465616854350916263157304197844422456562906124763996735273631680500",
-          ),
-          BigInt(
-            "97812403694419289483317826245817224897826619463759423455484352658636403681058",
-          ),
-          BigInt(
-            "33475241995917459510568876480036015513971225996034082646051580378741455108723",
-          ),
-        ];
+        // Fetch token IDs from database
+        let knownTokenIds: bigint[] = [];
+        try {
+          const response = await fetch("/api/tokenids");
+          if (response.ok) {
+            const data = await response.json();
+            knownTokenIds = data.tokenIds.map((id: string) => BigInt(id));
+            console.log(
+              `Loaded ${knownTokenIds.length} token IDs from database`,
+            );
+          } else {
+            console.warn(
+              "Failed to fetch token IDs from database:",
+              response.status,
+            );
+          }
+        } catch (error) {
+          console.error("Error fetching token IDs from database:", error);
+          // Fallback to empty array if database is not available
+          knownTokenIds = [];
+        }
+
+        // If no token IDs in database, show empty marketplace
+        if (knownTokenIds.length === 0) {
+          console.log(
+            "No token IDs found in database, showing empty marketplace",
+          );
+          return [];
+        }
 
         // Fetch known tokens sequentially to avoid overwhelming the RPC
         for (let i = 0; i < knownTokenIds.length; i++) {
