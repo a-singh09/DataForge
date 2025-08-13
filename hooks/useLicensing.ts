@@ -37,11 +37,11 @@ export function useLicensing() {
       const now = Date.now();
       setAccessCache((prev) => {
         const newCache = new Map();
-        for (const [key, value] of prev.entries()) {
+        prev.forEach((value, key) => {
           if (now - value.timestamp < CACHE_DURATION) {
             newCache.set(key, value);
           }
-        }
+        });
         return newCache;
       });
     };
@@ -243,7 +243,6 @@ export function useLicensing() {
     async (
       tokenId: bigint,
       periods: number = 1,
-      userAddress?: string,
     ): Promise<LicensePurchaseResult> => {
       if (!authenticated || !auth?.origin) {
         return {
@@ -252,38 +251,11 @@ export function useLicensing() {
         };
       }
 
-      // If no user address was provided, attempt to read it from the wallet provider
-      if (!userAddress) {
-        try {
-          if (typeof window !== "undefined" && (window as any).ethereum) {
-            const accounts = await (window as any).ethereum.request({
-              method: "eth_accounts",
-            });
-            if (accounts && accounts.length > 0) {
-              userAddress = accounts[0] as `0x${string}`;
-            }
-          }
-        } catch (_) {
-          // ignore and fall through to error below
-        }
-
-        if (!userAddress) {
-          return {
-            success: false,
-            error: "User address required for renewal.",
-          };
-        }
-      }
-
       setIsLoading(true);
 
       try {
         // Use Origin SDK's renewAccess method
-        const result = await auth.origin.renewAccess(
-          tokenId,
-          userAddress as `0x${string}`,
-          periods,
-        );
+        const result = await auth.origin.renewAccess(tokenId, periods);
 
         const transactionHash =
           typeof result === "string" ? result : result?.hash;

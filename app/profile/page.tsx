@@ -174,11 +174,7 @@ export default function ProfilePage() {
         setIsRenewing(false);
         return;
       }
-      const result = await renewAccess(
-        BigInt(renewTokenId),
-        renewPeriods,
-        addr as `0x${string}`,
-      );
+      const result = await renewAccess(BigInt(renewTokenId), renewPeriods);
       if (result.success) {
         toast({
           title: "Renewal successful",

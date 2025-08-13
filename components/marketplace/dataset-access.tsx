@@ -34,6 +34,7 @@ export default function DatasetAccess({
     null,
   );
   const [isDownloading, setIsDownloading] = useState(false);
+  const [dataStatus, setDataStatus] = useState<string | null>(null);
 
   // Check access status on component mount and when dataset changes
   useEffect(() => {
@@ -83,6 +84,16 @@ export default function DatasetAccess({
         const status = await checkAccess(dataset.tokenId, userAddress);
         console.log("License status check result:", status);
         setLicenseStatus(status);
+
+        // Also check data status
+        try {
+          const dataStatusResult = await origin.dataStatus(dataset.tokenId);
+          console.log("Data status:", dataStatusResult);
+          setDataStatus(dataStatusResult);
+        } catch (error) {
+          console.warn("Could not check data status:", error);
+          setDataStatus("unknown");
+        }
       } catch (error) {
         console.error("Failed to check license status:", error);
       }
@@ -134,6 +145,16 @@ export default function DatasetAccess({
       const status = await checkAccess(dataset.tokenId, userAddress);
       console.log("Manual license status refresh result:", status);
       setLicenseStatus(status);
+
+      // Also refresh data status
+      try {
+        const dataStatusResult = await origin.dataStatus(dataset.tokenId);
+        console.log("Manual refresh data status:", dataStatusResult);
+        setDataStatus(dataStatusResult);
+      } catch (error) {
+        console.warn("Could not refresh data status:", error);
+        setDataStatus("unknown");
+      }
       toast({
         title: "Status Refreshed",
         description: "License status has been updated.",
@@ -180,7 +201,44 @@ export default function DatasetAccess({
 
       console.log(`Getting data for token ${dataset.tokenId}`);
 
+      // Get the current wallet address to pass to getData
+      let userAddress: string | undefined;
+      try {
+        if (window.ethereum) {
+          const accounts = await window.ethereum.request({
+            method: "eth_accounts",
+          });
+          if (accounts && accounts.length > 0) {
+            userAddress = accounts[0];
+            console.log("Using wallet address for getData:", userAddress);
+          }
+        }
+      } catch (error) {
+        console.warn("Could not get wallet address for getData:", error);
+      }
+
+      if (!userAddress) {
+        throw new Error("Wallet address required for data access");
+      }
+
+      // Check data status first to see if the IpNFT is ready for download
+      console.log("Checking data status for token...");
+      const dataStatus = await origin.dataStatus(dataset.tokenId);
+      console.log("Data status:", dataStatus);
+
+      // If data is not ready yet, inform the user
+      // if (
+      //   !dataStatus ||
+      //   dataStatus === "pending" ||
+      //   dataStatus === "processing"
+      // ) {
+      //   throw new Error(
+      //     "Dataset is still being processed. Please try again in a few minutes. New datasets typically take up to 24 hours to become available for download.",
+      //   );
+      // }
+
       // Use Origin SDK's getData method to fetch the actual file content
+      // Pass the user address to ensure proper access validation
       const tokenData = await origin.getData(dataset.tokenId);
       console.log("Token data received:", tokenData);
 
@@ -543,6 +601,28 @@ export default function DatasetAccess({
             </div>
           )}
 
+        {/* Data Status */}
+        {dataStatus && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-400">Data Status</span>
+            <span
+              className={`text-sm font-medium ${
+                dataStatus === "active" || dataStatus === "ready"
+                  ? "text-green-400"
+                  : dataStatus === "pending" || dataStatus === "processing"
+                    ? "text-yellow-400"
+                    : "text-red-400"
+              }`}
+            >
+              {dataStatus === "active" || dataStatus === "ready"
+                ? "Ready"
+                : dataStatus === "pending" || dataStatus === "processing"
+                  ? "Processing"
+                  : dataStatus}
+            </span>
+          </div>
+        )}
+
         <Separator />
 
         {/* Access Actions */}
@@ -551,13 +631,25 @@ export default function DatasetAccess({
             {/* Direct Download */}
             <Button
               onClick={downloadDataset}
-              disabled={isDownloading}
-              className="w-full bg-orange-500 hover:bg-orange-600"
+              disabled={
+                isDownloading ||
+                (dataStatus &&
+                  dataStatus !== "active" &&
+                  dataStatus !== "ready")
+              }
+              className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50"
             >
               {isDownloading ? (
                 <>
                   <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                   Downloading...
+                </>
+              ) : dataStatus &&
+                dataStatus !== "active" &&
+                dataStatus !== "ready" ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Dataset Processing...
                 </>
               ) : (
                 <>
@@ -566,6 +658,20 @@ export default function DatasetAccess({
                 </>
               )}
             </Button>
+
+            {/* Data Processing Warning */}
+            {dataStatus &&
+              dataStatus !== "active" &&
+              dataStatus !== "ready" && (
+                <Alert className="border-blue-500/50 bg-blue-500/10">
+                  <RefreshCw className="h-4 w-4 text-blue-400" />
+                  <AlertDescription className="text-blue-400">
+                    This dataset is still being processed and will be available
+                    for download soon. New datasets typically take up to 24
+                    hours to become ready.
+                  </AlertDescription>
+                </Alert>
+              )}
 
             {/* Renewal Warning */}
             {licenseStatus.daysRemaining !== undefined &&

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ export default function Subscriptions() {
   const [selectedDataset, setSelectedDataset] = useState<IpNFTMetadata | null>(
     null,
   );
+  const hasLoadedRef = useRef<boolean>(false);
 
   const service = useMemo(() => {
     if (auth) {
@@ -55,8 +56,8 @@ export default function Subscriptions() {
     fetchWallet();
   }, []);
 
-  const refresh = async () => {
-    if (!service) return;
+  const refresh = useCallback(async () => {
+    if (!service || !wallet) return;
     setIsLoading(true);
     try {
       const params: MarketplaceQueryParams = {
@@ -66,7 +67,7 @@ export default function Subscriptions() {
       } as any;
 
       const data = await service.getMarketplaceData(params);
-      if (!data.items?.length || !wallet) {
+      if (!data.items?.length) {
         setItems([]);
         setIsLoading(false);
         return;
@@ -134,12 +135,14 @@ export default function Subscriptions() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [service, wallet, checkAccess]);
 
+  // Load subscriptions only once when wallet and service are available
   useEffect(() => {
-    if (!wallet || !service) return;
-    refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (wallet && service && !hasLoadedRef.current) {
+      hasLoadedRef.current = true;
+      refresh();
+    }
   }, [wallet, service]);
 
   const onOpenRenew = (dataset: IpNFTMetadata) => {
@@ -163,6 +166,8 @@ export default function Subscriptions() {
     setSelectedDataset(null);
     // Clear cache to ensure fresh data after renewal
     clearAccessCache();
+    // Reset the ref to allow refresh after renewal
+    hasLoadedRef.current = false;
     refresh();
   };
 
