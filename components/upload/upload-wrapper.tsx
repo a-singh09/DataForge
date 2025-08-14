@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth, useAuthState } from "@campnetwork/origin/react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, AlertCircle, Wallet } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { Loader2, AlertCircle } from "lucide-react";
 
 interface UploadWrapperProps {
   children: React.ReactNode;
