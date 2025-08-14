@@ -250,8 +250,7 @@ DataForge addresses critical challenges in the AI industry:
 
 ## 🌐 Links
 
-- **Live Demo**: [https://dataforge.app](https://dataforge.app)
-- **Documentation**: [https://docs.dataforge.app](https://docs.dataforge.app)
+- **Live Demo**: [https://data-forge-seven.vercel.app](https://data-forge-seven.vercel.app)
 
 ---
 
