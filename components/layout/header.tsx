@@ -44,7 +44,7 @@ export default function Header() {
               <span className="text-white font-bold text-sm">CV</span>
             </div>
             <span className="font-space text-xl font-bold gradient-text">
-              CreatorVault
+              DataForge
             </span>
           </Link>
 

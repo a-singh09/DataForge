@@ -1,53 +1,57 @@
 "use client";
 
-import { Button } from '@/components/ui/button';
-import { 
-  Upload, 
-  Twitter, 
-  Music, 
-  Video, 
+import { Button } from "@/components/ui/button";
+import {
+  Upload,
+  Twitter,
+  Music,
+  Video,
   FileText,
   Image,
-  ArrowRight
-} from 'lucide-react';
+  ArrowRight,
+} from "lucide-react";
 
 interface ContentSelectionProps {
-  selectedType: 'file' | 'social' | null;
-  onTypeSelect: (type: 'file' | 'social') => void;
+  selectedType: "file" | "social" | null;
+  onTypeSelect: (type: "file" | "social") => void;
   onNext: () => void;
 }
 
 const uploadOptions = [
   {
-    type: 'file' as const,
-    title: 'Upload Files',
-    description: 'Upload images, videos, audio, documents, or code files from your device',
+    type: "file" as const,
+    title: "Upload Files",
+    description:
+      "Upload images, videos, audio, documents, or code files from your device",
     icon: Upload,
     features: [
-      'Support for all major file formats',
-      'Batch upload multiple files',
-      'Automatic metadata extraction',
-      'Preview generation'
-    ]
+      "Support for all major file formats",
+      "Batch upload multiple files",
+      "Automatic metadata extraction",
+      "Preview generation",
+    ],
+    disabled: false,
   },
   {
-    type: 'social' as const,
-    title: 'Mint Social Content',
-    description: 'Connect your social accounts to mint content directly from your profiles',
+    type: "social" as const,
+    title: "Mint Social Content",
+    description:
+      "Coming Soon - Connect your social accounts to mint content directly from your profiles",
     icon: Twitter,
     features: [
-      'Twitter posts and threads',
-      'Spotify tracks and playlists',
-      'TikTok videos',
-      'Telegram messages'
-    ]
-  }
+      "Twitter posts and threads",
+      "Spotify tracks and playlists",
+      "TikTok videos",
+      "Telegram messages",
+    ],
+    disabled: true,
+  },
 ];
 
-export default function ContentSelection({ 
-  selectedType, 
-  onTypeSelect, 
-  onNext 
+export default function ContentSelection({
+  selectedType,
+  onTypeSelect,
+  onNext,
 }: ContentSelectionProps) {
   return (
     <div className="max-w-4xl mx-auto">
@@ -62,31 +66,49 @@ export default function ContentSelection({
         {uploadOptions.map((option) => {
           const Icon = option.icon;
           const isSelected = selectedType === option.type;
-          
+          const isDisabled = option.disabled;
+
           return (
             <div
               key={option.type}
-              className={`glass rounded-2xl p-8 cursor-pointer transition-all duration-300 hover:scale-105 ${
-                isSelected 
-                  ? 'border-2 border-orange-500 bg-orange-500/10' 
-                  : 'hover:bg-white/10'
+              className={`glass rounded-2xl p-8 transition-all duration-300 ${
+                isDisabled
+                  ? "opacity-60 cursor-not-allowed"
+                  : "cursor-pointer hover:scale-105"
+              } ${
+                isSelected
+                  ? "border-2 border-orange-500 bg-orange-500/10"
+                  : !isDisabled
+                    ? "hover:bg-white/10"
+                    : ""
               }`}
-              onClick={() => onTypeSelect(option.type)}
+              onClick={() => !isDisabled && onTypeSelect(option.type)}
             >
               <div className="text-center mb-6">
-                <div className={`h-16 w-16 rounded-xl mx-auto mb-4 flex items-center justify-center ${
-                  isSelected 
-                    ? 'bg-orange-500' 
-                    : 'bg-gradient-to-br from-gray-700 to-gray-800'
-                }`}>
+                <div
+                  className={`h-16 w-16 rounded-xl mx-auto mb-4 flex items-center justify-center ${
+                    isSelected
+                      ? "bg-orange-500"
+                      : "bg-gradient-to-br from-gray-700 to-gray-800"
+                  }`}
+                >
                   <Icon className="h-8 w-8 text-white" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">{option.title}</h3>
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <h3 className="text-xl font-semibold">{option.title}</h3>
+                  {isDisabled && (
+                    <span className="px-2 py-1 text-xs font-medium bg-gray-700 text-gray-300 rounded-full">
+                      Coming Soon
+                    </span>
+                  )}
+                </div>
                 <p className="text-gray-400">{option.description}</p>
               </div>
 
               <div className="space-y-3">
-                <h4 className="font-medium text-sm text-gray-300 mb-3">Features:</h4>
+                <h4 className="font-medium text-sm text-gray-300 mb-3">
+                  Features:
+                </h4>
                 {option.features.map((feature, index) => (
                   <div key={index} className="flex items-center space-x-3">
                     <div className="h-2 w-2 bg-orange-400 rounded-full flex-shrink-0" />
@@ -114,7 +136,8 @@ export default function ContentSelection({
             onClick={onNext}
             className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3"
           >
-            Continue with {selectedType === 'file' ? 'File Upload' : 'Social Minting'}
+            Continue with{" "}
+            {selectedType === "file" ? "File Upload" : "Social Minting"}
             <ArrowRight className="h-5 w-5 ml-2" />
           </Button>
         </div>

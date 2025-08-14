@@ -51,7 +51,7 @@ export default function Hero() {
           <div className="inline-flex items-center space-x-2 bg-orange-500/10 border border-orange-500/20 rounded-full px-4 py-2 mb-8">
             <Sparkles className="h-4 w-4 text-orange-400" />
             <span className="text-sm font-medium text-orange-400">
-              Gasless transactions on BaseCAMP L1
+              IpNFT transactions on BaseCAMP L1
             </span>
           </div>
 

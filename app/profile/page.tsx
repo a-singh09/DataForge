@@ -60,7 +60,7 @@ const socialPlatforms = [
     name: "Spotify",
     icon: Music,
     connected: true,
-    username: "CreatorVault Music",
+    username: "DataForge Music",
     color: "text-green-400",
   },
   {

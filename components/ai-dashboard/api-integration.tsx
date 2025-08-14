@@ -1,54 +1,60 @@
 "use client";
 
-import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Copy, 
-  Eye, 
-  EyeOff, 
-  Plus, 
-  Trash2, 
+import { useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  Copy,
+  Eye,
+  EyeOff,
+  Plus,
+  Trash2,
   BarChart3,
   Code,
   Book,
-  RefreshCw
-} from 'lucide-react';
+  RefreshCw,
+} from "lucide-react";
 
 const apiKeys = [
   {
-    id: '1',
-    name: 'Production API Key',
-    key: 'cv_prod_1234567890abcdef1234567890abcdef',
-    environment: 'production',
-    created: '2024-01-15',
-    lastUsed: '2024-01-20',
+    id: "1",
+    name: "Production API Key",
+    key: "cv_prod_1234567890abcdef1234567890abcdef",
+    environment: "production",
+    created: "2024-01-15",
+    lastUsed: "2024-01-20",
     requests: 1200000,
-    status: 'active'
+    status: "active",
   },
   {
-    id: '2',
-    name: 'Development API Key',
-    key: 'cv_dev_abcdef1234567890abcdef1234567890',
-    environment: 'development',
-    created: '2024-01-10',
-    lastUsed: '2024-01-19',
+    id: "2",
+    name: "Development API Key",
+    key: "cv_dev_abcdef1234567890abcdef1234567890",
+    environment: "development",
+    created: "2024-01-10",
+    lastUsed: "2024-01-19",
     requests: 45000,
-    status: 'active'
+    status: "active",
   },
   {
-    id: '3',
-    name: 'Testing API Key',
-    key: 'cv_test_567890abcdef1234567890abcdef1234',
-    environment: 'testing',
-    created: '2024-01-08',
-    lastUsed: '2024-01-18',
+    id: "3",
+    name: "Testing API Key",
+    key: "cv_test_567890abcdef1234567890abcdef1234",
+    environment: "testing",
+    created: "2024-01-08",
+    lastUsed: "2024-01-18",
     requests: 12000,
-    status: 'inactive'
-  }
+    status: "inactive",
+  },
 ];
 
 const codeExamples = {
@@ -95,16 +101,16 @@ curl -X GET "https://api.creatorvault.ai/v1/datasets/{dataset_id}" \\
 curl -X POST "https://api.creatorvault.ai/v1/datasets/{dataset_id}/download" \\
   -H "Authorization: Bearer your_api_key_here" \\
   -H "Content-Type: application/json" \\
-  -d '{"format": "json", "compression": "gzip"}'`
+  -d '{"format": "json", "compression": "gzip"}'`,
 };
 
 export default function ApiIntegration() {
   const [showKeys, setShowKeys] = useState<{ [key: string]: boolean }>({});
-  const [selectedLanguage, setSelectedLanguage] = useState('javascript');
-  const [newKeyName, setNewKeyName] = useState('');
+  const [selectedLanguage, setSelectedLanguage] = useState("javascript");
+  const [newKeyName, setNewKeyName] = useState("");
 
   const toggleKeyVisibility = (keyId: string) => {
-    setShowKeys(prev => ({ ...prev, [keyId]: !prev[keyId] }));
+    setShowKeys((prev) => ({ ...prev, [keyId]: !prev[keyId] }));
   };
 
   const copyToClipboard = (text: string) => {
@@ -112,7 +118,7 @@ export default function ApiIntegration() {
   };
 
   const maskKey = (key: string) => {
-    return key.slice(0, 12) + '...' + key.slice(-8);
+    return key.slice(0, 12) + "..." + key.slice(-8);
   };
 
   return (
@@ -150,7 +156,11 @@ export default function ApiIntegration() {
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Badge variant={apiKey.status === 'active' ? 'default' : 'secondary'}>
+                    <Badge
+                      variant={
+                        apiKey.status === "active" ? "default" : "secondary"
+                      }
+                    >
                       {apiKey.status}
                     </Badge>
                     <Button
@@ -158,7 +168,11 @@ export default function ApiIntegration() {
                       size="sm"
                       onClick={() => toggleKeyVisibility(apiKey.id)}
                     >
-                      {showKeys[apiKey.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showKeys[apiKey.id] ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
                     </Button>
                     <Button
                       variant="ghost"
@@ -172,7 +186,7 @@ export default function ApiIntegration() {
                     </Button>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <code className="text-sm bg-gray-900 px-3 py-2 rounded font-mono">
                     {showKeys[apiKey.id] ? apiKey.key : maskKey(apiKey.key)}
@@ -228,11 +242,15 @@ export default function ApiIntegration() {
               {Object.keys(codeExamples).map((lang) => (
                 <Button
                   key={lang}
-                  variant={selectedLanguage === lang ? 'default' : 'outline'}
+                  variant={selectedLanguage === lang ? "default" : "outline"}
                   size="sm"
                   onClick={() => setSelectedLanguage(lang)}
                 >
-                  {lang === 'javascript' ? 'JavaScript' : lang === 'python' ? 'Python' : 'cURL'}
+                  {lang === "javascript"
+                    ? "JavaScript"
+                    : lang === "python"
+                      ? "Python"
+                      : "cURL"}
                 </Button>
               ))}
             </div>
@@ -249,7 +267,11 @@ export default function ApiIntegration() {
               variant="ghost"
               size="sm"
               className="absolute top-2 right-2"
-              onClick={() => copyToClipboard(codeExamples[selectedLanguage as keyof typeof codeExamples])}
+              onClick={() =>
+                copyToClipboard(
+                  codeExamples[selectedLanguage as keyof typeof codeExamples],
+                )
+              }
             >
               <Copy className="h-4 w-4" />
             </Button>
@@ -267,19 +289,25 @@ export default function ApiIntegration() {
             <Button variant="outline" className="justify-start h-auto p-4">
               <div className="text-left">
                 <p className="font-medium">API Reference</p>
-                <p className="text-sm text-gray-400">Complete API documentation</p>
+                <p className="text-sm text-gray-400">
+                  Complete API documentation
+                </p>
               </div>
             </Button>
             <Button variant="outline" className="justify-start h-auto p-4">
               <div className="text-left">
                 <p className="font-medium">SDK Documentation</p>
-                <p className="text-sm text-gray-400">Language-specific guides</p>
+                <p className="text-sm text-gray-400">
+                  Language-specific guides
+                </p>
               </div>
             </Button>
             <Button variant="outline" className="justify-start h-auto p-4">
               <div className="text-left">
                 <p className="font-medium">Rate Limits</p>
-                <p className="text-sm text-gray-400">Usage limits and best practices</p>
+                <p className="text-sm text-gray-400">
+                  Usage limits and best practices
+                </p>
               </div>
             </Button>
             <Button variant="outline" className="justify-start h-auto p-4">

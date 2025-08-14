@@ -13,7 +13,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "CreatorVault - Monetize Your Content for AI",
+  title: "DataForge - Monetize Your Content for AI",
   description:
     "Decentralized marketplace for AI training data. Mint IpNFTs, license your content, and earn from AI companies.",
   keywords:

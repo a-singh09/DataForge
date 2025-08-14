@@ -1,37 +1,37 @@
-import Link from 'next/link';
-import { Github, Twitter, Disc as Discord } from 'lucide-react';
+import Link from "next/link";
+import { Github, Twitter, Disc as Discord } from "lucide-react";
 
 const footerLinks = {
   platform: [
-    { name: 'Marketplace', href: '/marketplace' },
-    { name: 'Upload Content', href: '/upload' },
-    { name: 'Creator Dashboard', href: '/dashboard' },
-    { name: 'AI Companies', href: '/ai-dashboard' },
+    { name: "Marketplace", href: "/marketplace" },
+    { name: "Upload Content", href: "/upload" },
+    { name: "Creator Dashboard", href: "/dashboard" },
+    { name: "AI Companies", href: "/ai-dashboard" },
   ],
   resources: [
-    { name: 'Documentation', href: '/docs' },
-    { name: 'API Reference', href: '/api' },
-    { name: 'Help Center', href: '/help' },
-    { name: 'Community', href: '/community' },
+    { name: "Documentation", href: "/docs" },
+    { name: "API Reference", href: "/api" },
+    { name: "Help Center", href: "/help" },
+    { name: "Community", href: "/community" },
   ],
   company: [
-    { name: 'About Us', href: '/about' },
-    { name: 'Careers', href: '/careers' },
-    { name: 'Blog', href: '/blog' },
-    { name: 'Contact', href: '/contact' },
+    { name: "About Us", href: "/about" },
+    { name: "Careers", href: "/careers" },
+    { name: "Blog", href: "/blog" },
+    { name: "Contact", href: "/contact" },
   ],
   legal: [
-    { name: 'Privacy Policy', href: '/privacy' },
-    { name: 'Terms of Service', href: '/terms' },
-    { name: 'Cookie Policy', href: '/cookies' },
-    { name: 'Licenses', href: '/licenses' },
+    { name: "Privacy Policy", href: "/privacy" },
+    { name: "Terms of Service", href: "/terms" },
+    { name: "Cookie Policy", href: "/cookies" },
+    { name: "Licenses", href: "/licenses" },
   ],
 };
 
 const socialLinks = [
-  { name: 'Twitter', icon: Twitter, href: 'https://twitter.com/creatorvault' },
-  { name: 'Discord', icon: Discord, href: 'https://discord.gg/creatorvault' },
-  { name: 'GitHub', icon: Github, href: 'https://github.com/creatorvault' },
+  { name: "Twitter", icon: Twitter, href: "https://twitter.com/DataForge" },
+  { name: "Discord", icon: Discord, href: "https://discord.gg/DataForge" },
+  { name: "GitHub", icon: Github, href: "https://github.com/DataForge" },
 ];
 
 export default function Footer() {
@@ -45,10 +45,13 @@ export default function Footer() {
               <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center">
                 <span className="text-white font-bold text-sm">CV</span>
               </div>
-              <span className="font-space text-xl font-bold gradient-text">CreatorVault</span>
+              <span className="font-space text-xl font-bold gradient-text">
+                DataForge
+              </span>
             </Link>
             <p className="text-gray-400 mb-6 max-w-sm">
-              The decentralized marketplace for AI training data. Monetize your content with IpNFTs and automated royalties.
+              The decentralized marketplace for AI training data. Monetize your
+              content with IpNFTs and automated royalties.
             </p>
             <div className="flex space-x-4">
               {socialLinks.map((item) => {
@@ -139,7 +142,7 @@ export default function Footer() {
 
         <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
           <p className="text-gray-400 text-sm">
-            © 2025 CreatorVault. All rights reserved.
+            © 2025 DataForge. All rights reserved.
           </p>
           <p className="text-gray-400 text-sm mt-4 md:mt-0">
             Powered by BaseCAMP L1

@@ -1,20 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import {
-  Upload,
-  FileText,
-  Image,
-  Music,
-  Video,
-  Code,
-  Hash,
-  ArrowRight,
-  ArrowLeft,
-  Loader2,
-} from "lucide-react";
+import { Upload, FileText, Image, Code, Hash } from "lucide-react";
 import UploadWrapper from "@/components/upload/upload-wrapper";
 import ContentSelection from "@/components/upload/content-selection";
 import FileUpload from "@/components/upload/file-upload";
@@ -22,8 +10,6 @@ import SocialMint from "@/components/upload/social-mint";
 import MetadataForm from "@/components/upload/metadata-form";
 import LicensingForm from "@/components/upload/licensing-form";
 import MintingProgress from "@/components/upload/minting-progress";
-import DebugOrigin from "@/components/upload/debug-origin";
-import SimpleFileUpload from "@/components/upload/simple-file-upload";
 
 const steps = [
   { id: "selection", title: "Content Type", icon: Upload },
@@ -168,12 +154,6 @@ function UploadContent() {
               );
             })}
           </div>
-        </div>
-
-        {/* Debug Components - Remove these in production */}
-        <div className="max-w-4xl mx-auto mb-8 space-y-4">
-          <DebugOrigin />
-          <SimpleFileUpload />
         </div>
 
         {/* Step Content */}

@@ -1,46 +1,46 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { Users, FileText, DollarSign, Building } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { Users, FileText, DollarSign, Building } from "lucide-react";
 
 const stats = [
   {
     icon: Users,
-    label: 'Total Creators',
-    value: 12847,
-    suffix: '+',
-    color: 'text-orange-400'
+    label: "Beta Creators",
+    value: 42,
+    suffix: "+",
+    color: "text-orange-400",
   },
   {
     icon: FileText,
-    label: 'Content Minted',
-    value: 89234,
-    suffix: '+',
-    color: 'text-purple-400'
+    label: "Datasets Uploaded",
+    value: 127,
+    suffix: "+",
+    color: "text-purple-400",
   },
   {
     icon: DollarSign,
-    label: 'Revenue Generated',
-    value: 2847392,
-    prefix: '$',
-    suffix: '+',
-    color: 'text-green-400'
+    label: "Demo Transactions",
+    value: 15420,
+    prefix: "$",
+    suffix: "+",
+    color: "text-green-400",
   },
   {
     icon: Building,
-    label: 'AI Companies',
-    value: 267,
-    suffix: '+',
-    color: 'text-blue-400'
-  }
+    label: "Partner Projects",
+    value: 8,
+    suffix: "+",
+    color: "text-blue-400",
+  },
 ];
 
-function AnimatedCounter({ 
-  target, 
+function AnimatedCounter({
+  target,
   duration = 2000,
-  prefix = '',
-  suffix = '' 
-}: { 
+  prefix = "",
+  suffix = "",
+}: {
   target: number;
   duration?: number;
   prefix?: string;
@@ -71,16 +71,18 @@ function AnimatedCounter({
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) {
-      return (num / 1000000).toFixed(1) + 'M';
+      return (num / 1000000).toFixed(1) + "M";
     } else if (num >= 1000) {
-      return (num / 1000).toFixed(0) + 'K';
+      return (num / 1000).toFixed(0) + "K";
     }
     return num.toLocaleString();
   };
 
   return (
     <span>
-      {prefix}{formatNumber(count)}{suffix}
+      {prefix}
+      {formatNumber(count)}
+      {suffix}
     </span>
   );
 }
@@ -90,18 +92,23 @@ export default function Stats() {
     <section className="py-24 relative">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 via-transparent to-purple-500/5" />
-      
+
       <div className="container mx-auto px-4 relative">
         {/* Section Header */}
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold mb-6">
-            Trusted by the
-            <span className="block gradient-text">AI Community</span>
+            Building the Future of
+            <span className="block gradient-text">AI Data Markets</span>
           </h2>
           <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-            Join thousands of creators already earning from their content 
-            and hundreds of AI companies building the future.
+            Early metrics from our hackathon prototype showcasing the potential
+            of decentralized AI training data marketplaces.
           </p>
+          <div className="mt-4 inline-flex items-center px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20">
+            <span className="text-sm text-orange-400 font-medium">
+              🚀 Hackathon Demo
+            </span>
+          </div>
         </div>
 
         {/* Stats Grid */}
@@ -123,8 +130,10 @@ export default function Stats() {
                   </div>
 
                   {/* Number */}
-                  <div className={`text-3xl md:text-4xl font-bold mb-2 ${stat.color}`}>
-                    <AnimatedCounter 
+                  <div
+                    className={`text-3xl md:text-4xl font-bold mb-2 ${stat.color}`}
+                  >
+                    <AnimatedCounter
                       target={stat.value}
                       prefix={stat.prefix}
                       suffix={stat.suffix}
@@ -141,9 +150,9 @@ export default function Stats() {
 
         {/* Bottom CTA */}
         <div className="text-center mt-16">
-          <p className="text-gray-400 mb-4">Ready to join the revolution?</p>
+          <p className="text-gray-400 mb-4">Ready to explore the prototype?</p>
           <div className="inline-flex items-center space-x-2 text-sm text-orange-400">
-            <span>Start earning in minutes</span>
+            <span>Try the demo platform</span>
             <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse" />
           </div>
         </div>

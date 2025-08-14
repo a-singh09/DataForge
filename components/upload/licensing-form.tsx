@@ -58,7 +58,7 @@ export default function LicensingForm({
   const auth = useAuth();
 
   const [licensing, setLicensing] = useState({
-    fixedPrice: 0.01, 
+    fixedPrice: 0.01,
     duration: 365 * 24 * 60 * 60, // 1 year in seconds
     royaltyPercentage: 95, // 95% to creator, 5% platform fee
     paymentToken: "0x0000000000000000000000000000000000000000", // Native ETH
@@ -267,9 +267,9 @@ export default function LicensingForm({
                     Royalty Information
                   </p>
                   <p className="text-xs text-gray-400 leading-relaxed">
-                    CreatorVault takes a small platform fee (2-15%) to maintain
-                    the marketplace and handle payments. The remaining
-                    percentage goes directly to you as the creator.
+                    DataForge takes a small platform fee (2-15%) to maintain the
+                    marketplace and handle payments. The remaining percentage
+                    goes directly to you as the creator.
                   </p>
                 </div>
               </div>
