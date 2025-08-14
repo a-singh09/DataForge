@@ -6,7 +6,7 @@ const footerLinks = {
     { name: "Marketplace", href: "/marketplace" },
     { name: "Upload Content", href: "/upload" },
     { name: "Creator Dashboard", href: "/dashboard" },
-    { name: "AI Companies", href: "/ai-dashboard" },
+    // { name: "AI Companies", href: "/ai-dashboard" },
   ],
   resources: [
     { name: "Documentation", href: "/docs" },
