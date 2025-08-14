@@ -43,12 +43,11 @@ DataForge bridges the gap between data creators and AI developers by providing:
 
 - **Frontend**: Next.js 14, React, TypeScript, Tailwind CSS
 - **Backend**: Node.js, MongoDB, Next.js API Routes
-- **Blockchain**: Origin SDK, Ethereum, IPFS
+- **Blockchain**: Origin SDK, Base Camp network
 - **Authentication**: NextAuth.js with Web3 wallet integration
 - **UI Components**: Radix UI, Lucide Icons
-- **File Storage**: IPFS for decentralized dataset storage
 
-## � Progblem Statement
+## � Problem Statement
 
 ### Current AI Industry Challenges
 
