@@ -4,7 +4,11 @@
 
 DataForge is a revolutionary platform that transforms how AI training datasets are created, licensed, and distributed. Built on blockchain technology using the Origin SDK, DataForge enables creators to monetize their valuable training data while providing AI developers with access to high-quality, ethically-sourced datasets.
 
-_Submission for URL Hackathon_
+_Submission for Camp Network Hackathon_
+
+#### Video Demo: https://x.com/singh09_a/status/1955900077269999828
+
+#### Deployed URL: https://data-forge-seven.vercel.app
 
 ## 🌟 What DataForge Does
 
